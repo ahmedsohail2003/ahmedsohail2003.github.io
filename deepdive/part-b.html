@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WorkCell Deep Dive — Part B — TalkToTheCell</title>
+<meta name="description" content="A 450M vision-language-action model, fine-tuned 0% → 90% on free GPUs — and why the same data that hurt ACT helped it.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🦾</text></svg>">
+<link rel="stylesheet" href="deepdive.css">
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js"></script>
+<script src="deepdive.js" defer></script>
+</head>
+<body>
+<div class="wrap">
+
+<nav class="topnav">
+  <span class="crumb"><a href="../">← Portfolio</a> · <b>WorkCell Deep Dive</b></span>
+  <span class="chapters">
+    <a href="index.html">Overview</a>
+    <a href="part-a.html">A</a><a class="here" href="part-b.html">B</a><a href="part-c.html">C</a><a href="part-d.html">D</a><a href="part-e.html">E</a>
+    <a href="lessons.html">Lessons</a>
+  </span>
+</nav>
+
+<h1>Part B — TalkToTheCell</h1>
+<p class="subtitle">A 450M vision-language-action model, fine-tuned 0% → 90% on free GPUs — and why the same data that hurt ACT helped it.</p>
+
+<script type="text/markdown">
+Part B is where the series pivots from specialists to foundation models. Part A answered "can a small behavior-cloning policy copy the expert from pixels?" — ACT, trained from scratch on 100 demos, reached 65% (75% with ensembling). This part asks the follow-up that industrial robotics actually cares about: **can a pretrained generalist be steered to the same task with a sentence?** Same MuJoCo work-cell, same 100 demonstrations, but the policy is now SmolVLA (450M) — a vision-language-action model that arrives knowing nothing about my cell (0/20 zero-shot, measured) and gets fine-tuned toward *"Pick up the red block and place it in the blue tray."*
+
+The answer came in two acts: 0% → 55% on the nominal demos, then 55% → 90% on the recovery set — the identical data that pushed ACT *down* 65% → 50%. That opposite-direction result on the same data became the headline finding of the whole portfolio, and it fell out of doing the comparison honestly rather than being planned.
+
+## The build, step by step
+
+### 1. Pick a model that fits free compute
+
+The constraint came first: I have a 6 GB laptop GPU and free Kaggle T4s (16 GB). pi0 (~3B) and OpenVLA (7B) do not fit a T4 for fine-tuning on this budget; SmolVLA (450M) does, and it's LeRobot-native, so the dataset, training CLI, and eval stack from Part A carry over unchanged (documented). The recipe that makes even 450M fit: freeze the VLM backbone and train only the ~100M flow-matching action expert, with AMP and batch 8 versus the paper's batch 64 on an A100 (measured — flags in the notebook and README).
+
+### 2. Establish the zero-shot floor
+
+Before spending any GPU hours I ran the base `lerobot/smolvla_base` through the exact ACT eval protocol: 0/20, never engages the block (measured). That number matters — everything after it is attributable to fine-tuning, not to the pretrained model already knowing the task.
+
+### 3. Build the Kaggle notebook — three fixes en route
+
+The notebook ([`kaggle_smolvla_finetune.ipynb`](https://github.com/ahmedsohail2003/workcell-partB-vla/blob/master/notebooks/kaggle_smolvla_finetune.ipynb)) took three debugging rounds (documented, and visible in the notebook comments): the `smolvla` extra alone is missing `av`, so the install must be `lerobot[smolvla,dataset]`; a mid-session install leaves failed imports cached, so the kernel needs a restart; and the base model expects cameras named `camera1/2/3` while my dataset says `front`/`wrist`, so training needs `--rename_map` (the absent `camera3` is accepted as a skipped subset). A smaller papercut: IPython's `!` interpolation can't mix `{var}` placeholders with the rename map's literal JSON braces, so the train command is assembled as a Python string first (measured — in the notebook).
+
+### 4. The step-budget dead end
+
+I wanted 20k steps. Measured throughput was 2.43 s/step on the T4, which puts 20k at ~13.5 h — over Kaggle's 12 h session cap. I trimmed to 12k (~8.1 h), with checkpoints every 5k and a documented resume path in case the session died (measured). Training ran loss 0.97 → 0.06 and pushed the model straight to the Hub.
+
+### 5. First eval: 55%, and the failures all rhyme
+
+Back on the local machine, [`eval_smolvla.py`](https://github.com/ahmedsohail2003/workcell-partB-vla/blob/master/scripts/eval_smolvla.py) runs the identical protocol as Part A's ACT eval — 20 episodes, seed 123, nominal scene, 240-step cap. Result: 11/20 (55%) (measured). Below ACT's 65%. But the failure pattern was clean: every single failure was a non-engagement on a right-side block spawn — a coverage gap, not a competence gap (measured, on the model card).
+
+### 6. The v2 retrain — and the finding I didn't plan
+
+Part A had meanwhile produced a 160-episode `-v2` dataset that adds recovery demonstrations. The notebook is parameterized, so the retrain was a two-line change. SmolVLA on `-v2`: 18/20 (90%) — coverage fixed, and one of the successes is a live miss→retry→recover at 165 steps, behavior straight out of the recovery demos (measured). The same data had already dropped ACT from 65% to 50% (measured, documented as a [negative-result card](https://huggingface.co/ahmedsohail2003/act-so101-pickplace-v2)). Identical dataset, opposite directions: ACT's chunked L1 regression averages across the now-multimodal proceed-vs-retry continuations; SmolVLA's flow-matching expert models the distribution and just learns both modes. Architecture decides whether behavioral diversity is signal or poison — mechanism confirmed from both sides because both architectures saw the same data under the same protocol.
+
+### 7. Publish everything
+
+Both models with cards and demo GIFs went public — [v1 (55%)](https://huggingface.co/ahmedsohail2003/smolvla-so101-pickplace) and [v2 (90%)](https://huggingface.co/ahmedsohail2003/smolvla-so101-pickplace-v2) — with the v1 card kept up as the honest intermediate result, not buried.
+
+## Decisions & alternatives
+
+#### SmolVLA (450M), not pi0 or OpenVLA
+
+**Chose:** SmolVLA. **Alternatives considered:** pi0 (~3B), OpenVLA (7B). **Why:** it is the only VLA class that fits a free 16 GB T4 for fine-tuning, and it's LeRobot-native, so Part A's dataset format, `lerobot-train`, and eval harness all carry over (documented). **Tradeoff accepted:** the larger models would likely have done better on the things a VLA is *for* — richer language grounding, stronger zero-shot transfer, more headroom before saturating — and OpenVLA has a bigger community fine-tuning ecosystem to lean on. I gave those up for the ability to train at all. **What would change this:** a paid A100 budget, or quantized-fine-tune recipes for the 3B–7B class that reliably fit 16 GB.
+
+#### Freeze the VLM, train only the ~100M action expert
+
+**Chose:** LeRobot's defaults — frozen vision encoder, expert-only training. **Alternatives considered:** full fine-tuning, which wants ~24 GB VRAM (documented). **Why:** it's the difference between fitting and not fitting the T4, with AMP and batch 8 on top. **Tradeoff accepted:** the vision backbone never adapts to my MuJoCo renders, so any sim-specific visual gap stays open; full fine-tuning might have lifted v1 above 55%, and I can't rule that out. LoRA on the backbone would be a middle path (judgment — not attempted). **What would change this:** more VRAM, or evidence that failures were perceptual rather than behavioral — the right-side non-engagement pattern pointed at data coverage, not vision, which is why I didn't fight this harder.
+
+#### 12k steps, not 20k
+
+**Chose:** 12k. **Alternatives considered:** 20k in one session; 20k via checkpoint-resume across sessions. **Why:** measured 2.43 s/step puts 20k at ~13.5 h against Kaggle's 12 h cap; 12k ≈ 8.1 h fits with margin (measured). **Tradeoff accepted:** possible undertraining. Loss had flattened at 0.06 (measured), but loss is a weak proxy for rollout success, so 20k might genuinely have scored higher. The multi-session resume path was built and documented as the fallback (measured — in the notebook). **What would change this:** if 12k had underperformed badly, I'd have paid the resume-workflow complexity; 55%-with-a-clean-failure-pattern said the next dollar was better spent on data.
+
+#### Keep the eval protocol byte-identical to ACT's
+
+**Chose:** 20 episodes, seed 123, nominal scene, 240-step cap — exactly Part A's protocol (measured — hardcoded in `eval_smolvla.py`). **Alternatives considered:** larger n; a VLA-tailored protocol. **Why:** every row in the results table is only meaningful because the protocol never moves; the cross-architecture finding depends entirely on this. **Tradeoff accepted:** n=20 has wide confidence intervals — 55% vs 65% is not a statistically strong separation, and I say so rather than pretending otherwise (judgment). **What would change this:** more eval compute → n=50+; the 0% vs 90% endpoints are unambiguous either way.
+
+#### Fix the 55% with the `-v2` recovery set, not more nominal demos
+
+**Chose:** retrain on Part A's 160-episode `-v2` set (nominal + recovery demos). **Alternatives considered:** recording additional nominal demos targeted at right-side spawns. **Why:** v1's failures were 100% right-side non-engagements (measured), and the `-v2` set already existed with broader coverage plus retry behavior. **Tradeoff accepted:** this confounds two variables — coverage and behavioral multimodality. Targeted nominal demos would almost certainly have fixed SmolVLA too, and would likely have *helped* ACT instead of dropping it to 50%, since unimodal data is what chunked regression wants. That cleaner path would have produced a better ACT and no finding; the confounded path produced the portfolio's headline result, but honesty requires noting I didn't choose it for that reason (judgment). **What would change this:** an ablation with a 160-episode nominal-only set would separate coverage from diversity properly — that's the experiment I'd run next.
+
+#### One fixed instruction string
+
+**Chose:** a single task string — *"Pick up the red block and place it in the blue tray."* — flowing through the tokenizer at train and eval; the tray was kept blue partly with language work in mind (documented). **Alternatives considered:** paraphrase augmentation; a second task to test instruction-following. **Why:** the cell has one task, and the string exercises the full language-conditioning path end to end. **Tradeoff accepted:** with one instruction, language is carried but never *tested* — the model could ignore the text entirely and every number in the table would look the same, and ACT does the identical task with no language at all. I don't claim instruction-following; I claim the pipeline is language-ready (judgment). **What would change this:** a second object/tray combination in the scene, which is the natural Part B follow-up.
+
+## Reading map for reviewers
+
+- Start with the [README results table](https://github.com/ahmedsohail2003/workcell-partB-vla/blob/master/README.md) — six rows, one protocol, the whole argument in miniature; the cross-architecture paragraph below it is the payoff.
+- [`notebooks/kaggle_smolvla_finetune.ipynb`](https://github.com/ahmedsohail2003/workcell-partB-vla/blob/master/notebooks/kaggle_smolvla_finetune.ipynb) — the complete free-tier recipe; the cell comments record the fixes (extras, rename_map, step-budget math) as they happened.
+- [`scripts/eval_smolvla.py`](https://github.com/ahmedsohail2003/workcell-partB-vla/blob/master/scripts/eval_smolvla.py) — the fixed protocol; note `--repo` swaps in `lerobot/smolvla_base` for the zero-shot row.
+- [`outputs/smolvla_v2_episode.gif`](https://github.com/ahmedsohail2003/workcell-partB-vla/blob/master/outputs/smolvla_v2_episode.gif) — the 90% policy running.
+- Off-repo: the [v2 model card](https://huggingface.co/ahmedsohail2003/smolvla-so101-pickplace-v2) and the [ACT negative-result card](https://huggingface.co/ahmedsohail2003/act-so101-pickplace-v2) — both sides of the same-data experiment.
+</script>
+
+<div class="readme-box" data-readme="workcell-partB-vla">
+  <div class="rb-head">
+    <b>The full README — live from GitHub</b>
+    <span>fetched from <a href="https://github.com/ahmedsohail2003/workcell-partB-vla">ahmedsohail2003/workcell-partB-vla</a>, always current</span>
+  </div>
+  <div class="rb-body"><p>Loading…</p></div>
+</div>
+
+<div class="pager">
+  <a href="part-a.html">← Part A — Sim2Cell</a>
+  <span class="spacer"></span>
+  <a href="part-c.html">Part C — GraspSight →</a>
+</div>
+
+</div>
+</body>
+</html>

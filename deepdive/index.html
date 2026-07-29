@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WorkCell Deep Dive — Overview</title>
+<meta name="description" content="A guided, chapter-by-chapter walkthrough of the WorkCell series: what was built, in what order, why each decision went the way it did, and what the alternatives would have bought.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🦾</text></svg>">
+<link rel="stylesheet" href="deepdive.css">
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js"></script>
+<script src="deepdive.js" defer></script>
+</head>
+<body>
+<div class="wrap">
+
+<nav class="topnav">
+  <span class="crumb"><a href="../">← Portfolio</a> · <b>WorkCell Deep Dive</b></span>
+  <span class="chapters">
+    <a class="here" href="index.html">Overview</a>
+    <a href="part-a.html">A</a><a href="part-b.html">B</a><a href="part-c.html">C</a>
+    <a href="part-d.html">D</a><a href="part-e.html">E</a>
+    <a href="lessons.html">Lessons</a>
+  </span>
+</nav>
+
+<h1>The WorkCell series, explained end to end</h1>
+<p class="subtitle">A guided walkthrough for reviewers: what was built, in what order,
+why each decision went the way it did — and what the alternatives would have bought.</p>
+
+<script type="text/markdown">
+## What this is
+
+The [one-page portfolio](https://ahmedsohail2003.github.io/) is the trailer. This is
+the tour. Each chapter walks one project start-to-finish in build order, then — the
+part that matters most — lays out the **decisions and alternatives**: what I chose,
+what I rejected, what the rejected option would have done *better*, and what evidence
+(if any) settles the question. At the bottom of every chapter, the project's full
+README is embedded **live from GitHub**, so this site can never drift out of sync
+with the repositories.
+
+Every "why" is labeled one of three ways, and the label is part of the claim:
+
+- **(measured)** — a number in the repo backs it,
+- **(documented)** — the decision was recorded when it was made,
+- **(judgment)** — an engineering call that could reasonably have gone the other way.
+
+If you're here to review: blunt criticism is the useful kind. There's a public
+[feedback thread](https://github.com/ahmedsohail2003/workcell-partA-imitation/discussions/1),
+and every chapter ends with a reading map of what to check.
+
+## The purpose
+
+One question drives the whole series: **how do you make a robot arm do useful work —
+and how do the competing schools of thought actually compare when you hold the robot,
+the task, and the evaluation constant?** So: one simulated industrial work-cell (an
+SO-ARM100 arm, a block, a tray, in MuJoCo), one manipulation setting, and five
+approaches that span the field — imitation learning (A), a vision-language-action
+foundation model (B), classical engineered perception (C), reinforcement learning
+and world models (D), and the ROS 2 deployment layer real factories run on (E).
+Same robot, same cell — so when two methods disagree, the difference is the method.
+
+## The budget box (read the decisions with this in mind)
+
+Everything was built solo, in about a month, on: a Windows laptop with a 6 GB RTX
+4050 and 16 GB RAM, ~42 GB of free disk, **free-tier cloud GPUs only** (Kaggle T4s),
+and **no physical robot** — simulation only. Several "why not X?" answers reduce to
+*X does not fit this box*: Isaac Sim doesn't fit the disk, π0/OpenVLA don't fit a
+free T4, ROS 2 from source doesn't fit the disk either. That's not an excuse — it's
+the design input that made the series what it is, and the constraint most student
+projects share but few state.
+
+## The robot and the task
+
+The [SO-ARM100/101](https://github.com/TheRobotStudio/SO-ARM100) is the ~$150 5-DoF
+arm + gripper the LeRobot community standardized on, which means every format in this
+series — dataset schema, policy interface, teleop conventions — transfers directly to
+real hardware. The core task: pick a 24 mm cube from a randomized spawn and place it
+in a tray, from two RGB cameras (front + wrist) at 15 Hz. Parts C and E extend the
+cell with a depth camera and a mobile-robot transport layer respectively.
+
+## How to read
+
+Chapters are in series order, A → E, which is also roughly build order. Each chapter:
+**role in the series** → **step-by-step walkthrough** (including the dead ends — they're
+the good parts) → **decisions & alternatives** → **reading map** → **the full README, live**.
+If you only have 20 minutes: read this page, then chapter A (the flagship), then
+[Lessons](lessons.html).
+
+## The measurement rules
+
+Fixed protocol before anything got measured: held-out evaluation seeds (never the
+data-collection seed), success counted by a geometric predicate, n printed next to
+every percentage, paired comparisons on identical spawn sequences where possible, and
+failures published with the same care as successes — including two negative results
+with full forensics and one evaluation-harness bug that produced a false headline
+number and got a public correction. The
+[ACT reproduction report](https://github.com/ahmedsohail2003/workcell-partA-imitation/blob/master/docs/ACT_REPRODUCTION.md)
+applies the same rules to someone else's paper.
+
+## Chapters
+
+1. **[Part A — Sim2Cell](part-a.html)** · imitation learning: the full pipeline from
+   scratch, ACT at 90% from pixels, the domain-randomization study, and two negative
+   results that taught more than the successes.
+2. **[Part B — TalkToTheCell](part-b.html)** · a 450M vision-language-action model
+   fine-tuned from 0% to 90% on free GPUs, and the cross-architecture study that
+   explains *why* the same data helps one architecture and hurts another.
+3. **[Part C — GraspSight](part-c.html)** · the classical answer: RGB-D → point cloud
+   → 6-DoF pose → grasp, every algorithm from scratch, 20/20 with zero runtime
+   ground truth.
+4. **[Part D — PolicyForge](part-d.html)** · reinforcement learning vs a from-scratch
+   world model + CEM-MPC: 37× the sample efficiency, a reset-bug forensic, and a
+   four-stage reward-design study.
+5. **[Part E — CellOps](part-e.html)** · ROS 2: autonomous SLAM → Nav2 (12/12), and
+   Part C's estimator ported to C++ at 0.000 mm parity, 3.3× faster.
+6. **[Lessons](lessons.html)** · what transfers across all five: where data beats
+   architecture, how simulation fails silently, and what I'd do differently.
+</script>
+
+<div class="pager">
+  <span class="spacer"></span>
+  <a href="part-a.html">Part A — Sim2Cell →</a>
+</div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WorkCell Deep Dive — Part D — PolicyForge</title>
+<meta name="description" content="Reinforcement learning vs a from-scratch world model — 37× the sample efficiency, and a reward-design study in four acts.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🦾</text></svg>">
+<link rel="stylesheet" href="deepdive.css">
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js"></script>
+<script src="deepdive.js" defer></script>
+</head>
+<body>
+<div class="wrap">
+
+<nav class="topnav">
+  <span class="crumb"><a href="../">← Portfolio</a> · <b>WorkCell Deep Dive</b></span>
+  <span class="chapters">
+    <a href="index.html">Overview</a>
+    <a href="part-a.html">A</a><a href="part-b.html">B</a><a href="part-c.html">C</a><a class="here" href="part-d.html">D</a><a href="part-e.html">E</a>
+    <a href="lessons.html">Lessons</a>
+  </span>
+</nav>
+
+<h1>Part D — PolicyForge</h1>
+<p class="subtitle">Reinforcement learning vs a from-scratch world model — 37× the sample efficiency, and a reward-design study in four acts.</p>
+
+<script type="text/markdown">
+Part D is where the WorkCell series stops copying and starts discovering. Parts A and B taught the arm by demonstration, and Part C engineered the solution by hand; Part D asks whether the same robot, in the same MuJoCo work-cell, can find the behavior on its own from a reward signal — and, once it can, how much a learned model of the world is worth in sample efficiency.
+
+The project answers two questions with numbers. First, on a Reach task: a from-scratch PETS-style world model with CEM-MPC planning hits 100% success on 8,000 environment steps, versus SAC at 100k and PPO at 300k — the textbook model-based ≫ off-policy ≫ on-policy hierarchy, reproduced on my own hardware model (measured). Second, on a contact-rich Lift task: what does it actually take to make RL work when it doesn't at first? The answer turned out to be one forensic bug hunt and a four-stage reward-design study, and I've documented the failures as carefully as the shipped result.
+
+## The build, step by step
+
+### Environments before algorithms
+
+I built [`envs.py`](https://github.com/ahmedsohail2003/workcell-partD-rl/blob/master/src/policyforge/envs.py) first: a Gymnasium base env on the SO-ARM100 scene with actions as bounded deltas on the position-actuator setpoints, and — because those actuators are stateful — the setpoints included in the observation so the state is Markov-complete (documented). Reach targets were originally free-sampled; a scripted probe failed 7/10 episodes, traced to unreachable high-radius samples (measured). The fix moved IK validation (residual < 5 mm) into the target sampler itself, making solvability an env property instead of a training-time surprise.
+
+### Reach: model-free baselines
+
+PPO reached 100% on all 3 seeds at 300k steps; SAC averaged 97% (95–100%) at 100k, both on 20 fixed-seed eval episodes (measured). Reach exists to verify the RL plumbing end to end and to set the model-free baseline for what came next.
+
+### Reach: the world model
+
+[`worldmodel.py`](https://github.com/ahmedsohail2003/workcell-partD-rl/blob/master/src/policyforge/worldmodel.py) is deliberately minimal: a 3-MLP ensemble on normalized delta targets, with the known setpoint update computed analytically so the network learns only the true unknowns. A CEM planner rolls the ensemble mean over a 15-step horizon (256 candidates × 4 iterations, warm-started, MPC replanning every step). Round 0 — trained on just 8k random-policy transitions — already planned at 100% (measured). Three more PETS-style collection rounds shrank model loss 5× without changing success: the task was solved, the extra data only sharpened the model. Net result: 100% at 37× fewer environment interactions than PPO, 12× fewer than SAC (measured) — under conditions that favor model-based control, which the README states plainly.
+
+### Lift looked unsolvable — then a forensic found the real bug
+
+Early Lift runs learned nothing, and the tempting story was "the task is too hard." The forensic tell was eval episode length pinned at exactly 8.45 = (150+19)/20, identical across seeds (measured): every episode after the first was truncating at one step. `LiftEnv.reset` never called `_reset_arm`, so physics went stale and the step counter never zeroed — all old PPO lift runs were invalid (documented). The fix was one line, plus a regression test so it stays fixed.
+
+### Four reward designs, each exposing the next failure
+
+With the env honest, I switched to SAC and ran a reward study where every stage's failure is part of the record (measured, all on 20 eval episodes):
+
+- **v0 — terminate on success, one-time +5:** 0/20. The policy grasps and lifts to a median 6.3 cm, then hovers just below the 7 cm line — ending the episode forfeits ~120 discounted future shaping for +5, so *never succeeding* is optimal. An IK sweep proved the block was liftable to ~0.5 m, killing the "arm can't reach" hypothesis: the ceiling was the reward, not the kinematics.
+- **v2 — lift-and-hold, no early termination:** 20/20, but the lift term saturates at 8.2 cm and the bonus is flat above the line, so the arm exploits the open top and over-extends to ~0.5 m — a real grasp, an unnatural yank.
+- **v3 — tent reward peaking at 14 cm:** natural height at last, but 6/20 — spreading the climb reward over 0–14 cm halved the near-floor gradient (0.23 vs 0.43 per cm) and the block often never left the table.
+- **v4 — steep climb-to-7 cm plus a soft cap:** the shipped design. Steep climb restores the get-off-the-table drive; the cap gives v2's missing stopping gradient. The block settles at a natural ~16 cm.
+
+### Three seeds and a stochastic local optimum
+
+Final SAC results: 90% / 75% / 55%, mean 73% (measured). Every seed first plateaus at grasp-without-lift (~120 return), then escapes discontinuously: seed 0 by ~150k steps, seed 1 at ~250k, seed 2 not until 480k. At a fixed 300k budget that reads as 90/75/0%; re-running seed 2 to 500k recovered 55% and showed the zero was under-training, not incapacity (measured). The README plots per-seed curves instead of a mean±std band precisely because the band would smear the staggered breakthroughs that are the finding.
+
+## Decisions & alternatives
+
+#### Environment design: IK-validated targets and Markov-complete observations
+
+**Chose:** Reach targets verified reachable by IK at sample time (residual < 5 mm), and actuator setpoints included in the observation. **Alternatives considered:** free target sampling with a reject-on-timeout policy; observations without setpoints. **Why:** a scripted probe failed 7/10 on free-sampled targets, all at unreachable high radii (measured) — I wanted solvability to be an env guarantee, not something an RL curve has to be debugged for later. The setpoints are hidden state (position actuators are stateful), so omitting them makes the problem needlessly partially observed (documented). **Tradeoff accepted:** an IK solve per reset costs time, and validated targets mean the reported success rates say nothing about how policies handle infeasible goals. **What would change this:** a task where target feasibility is itself part of the problem, or pixel observations where privileged state isn't available.
+
+#### World-model class: PETS-style ensemble + CEM-MPC over a Dreamer-class latent model
+
+**Chose:** a 3-MLP deterministic dynamics ensemble with a CEM planner (15-step horizon, 256 candidates, replan every step). **Alternatives considered:** Dreamer-style latent world model with a learned policy. **Why:** judgment call — from-scratch feasible in days, fully interpretable (predictions live in `[qpos, qvel, tcp]`), and right-sized for a fully observed, short-horizon reach task. It delivered the point of the exercise: 100% at 8k steps (measured). **Tradeoff accepted:** Dreamer would genuinely be better at what this setup can't do — pixels, partial observability, long horizons — and amortizes planning into a policy, where CEM pays 256×4 rollouts every control step at deployment. **What would change this:** image observations, stochastic dynamics, or horizons long enough that CEM's open-loop candidates stop being competitive.
+
+#### Learning only the unknowns: analytic setpoint update inside the model
+
+**Chose:** compute `ctrl' = clip(ctrl + a·Δ)` analytically; the ensemble predicts only next `[qpos, qvel, tcp]`. **Alternatives considered:** learn the full transition end to end. **Why:** that part of the dynamics is known exactly, so making a network rediscover it only adds error and data cost (judgment, consistent with the 8k-step result). **Tradeoff accepted:** the model is coupled to this action parameterization; change the actuation scheme and the model code changes too. **What would change this:** an action space whose effect on state isn't known in closed form.
+
+#### SAC for Lift, and consciously skipping a PPO contrast run
+
+**Chose:** SAC for the contact-rich Lift task; no PPO-lift run. **Alternatives considered:** PPO, or both. **Why:** off-policy replay is the standard sample-efficiency choice for sparse-contact manipulation, and after the reset-bug invalidated all old PPO lift runs I put the compute budget into the reward study and a 3-seed SAC evaluation instead (documented). **Tradeoff accepted:** the honest cost is that Lift lacks the cross-algorithm table Reach has — PPO might well have been more stable per seed, and I can't show it wasn't. **What would change this:** spare compute; the contrast run is the first thing I'd add.
+
+#### Reward: lift-and-hold with a steep climb and soft cap (v4)
+
+**Chose:** no early termination, per-step in-goal bonus, steep climb-to-7 cm, soft cap above target. **Alternatives considered:** v0 terminate-on-success (standard, shortest episodes — but 0/20: termination forfeits ~120 of discounted shaping for +5, so never succeeding is optimal), v2 uncapped lift-and-hold (20/20 but over-extends to 0.5 m), v3 tent at 14 cm (the most principled shape, with a unique optimum at the target — but diluting the near-floor gradient to 0.23/cm dropped it to 6/20) (all measured). **Why:** v4 is the only design that keeps v2's escape gradient and v3's natural height. **Tradeoff accepted:** it's a hand-tuned shape with two magic numbers; a sparse reward plus better exploration would be more elegant. **What would change this:** an exploration method strong enough to make dense shaping unnecessary.
+
+#### Reporting: extend seed 2 to 500k and publish per-seed curves
+
+**Chose:** rerun the stuck seed past its plateau, disclose the unequal budget, and plot per-seed curves rather than mean±std. **Alternatives considered:** report 90/75/0% at a fixed 300k; report a mean band. **Why:** the plateau is a grasp-without-lift local optimum that every seed escapes at a different time — 150k, 250k, 480k (measured) — so the fixed-budget zero measured *when*, not *whether*, and a band would smear exactly that structure. **Tradeoff accepted:** fixed equal budgets are the cleaner benchmark protocol, and the 55% is not comparable to the 90/75 at face value — the README flags this rather than hiding it. **What would change this:** enough seeds to characterize the escape-time distribution properly, at which point equal budgets plus that distribution is the better report.
+
+## Reading map for reviewers
+
+- Start with the [README](https://github.com/ahmedsohail2003/workcell-partD-rl/blob/master/README.md) headline table and its honest-scope note, then the Lift reward-study table — the four-stage progression is the core of the project.
+- [`src/policyforge/envs.py`](https://github.com/ahmedsohail2003/workcell-partD-rl/blob/master/src/policyforge/envs.py) — `_reset_arm` (the bug site), the IK-validated target sampler, and the v4 Lift reward terms.
+- [`src/policyforge/worldmodel.py`](https://github.com/ahmedsohail2003/workcell-partD-rl/blob/master/src/policyforge/worldmodel.py) — ensemble, analytic setpoint update, CEM-MPC planner.
+- [`scripts/train.py`](https://github.com/ahmedsohail2003/workcell-partD-rl/blob/master/scripts/train.py) and [`scripts/train_worldmodel.py`](https://github.com/ahmedsohail2003/workcell-partD-rl/blob/master/scripts/train_worldmodel.py) — all hyperparameters and the PETS-style loop.
+- [`scripts/eval_success.py`](https://github.com/ahmedsohail2003/workcell-partD-rl/blob/master/scripts/eval_success.py) — the shared success protocol behind every number.
+- [`scripts/verify_env.py`](https://github.com/ahmedsohail2003/workcell-partD-rl/blob/master/scripts/verify_env.py) — env gates and the scripted solvability probe that caught the 7/10 failure.
+</script>
+
+<div class="readme-box" data-readme="workcell-partD-rl">
+  <div class="rb-head">
+    <b>The full README — live from GitHub</b>
+    <span>fetched from <a href="https://github.com/ahmedsohail2003/workcell-partD-rl">ahmedsohail2003/workcell-partD-rl</a>, always current</span>
+  </div>
+  <div class="rb-body"><p>Loading…</p></div>
+</div>
+
+<div class="pager">
+  <a href="part-c.html">← Part C — GraspSight</a>
+  <span class="spacer"></span>
+  <a href="part-e.html">Part E — CellOps →</a>
+</div>
+
+</div>
+</body>
+</html>
