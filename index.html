@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Ahmed Sohail Butt — Embodied AI Portfolio</title>
-<meta name="description" content="One simulated industrial work-cell, five ways to teach a robot: imitation learning, VLA fine-tuning, classical 6-DoF grasping, RL + world models, and ROS 2 — with honest measurement throughout.">
-<meta property="og:title" content="Ahmed Sohail Butt — Embodied AI Portfolio">
-<meta property="og:description" content="One robot, one task, five learning paradigms. ACT 90% from pixels, SmolVLA 0→90% language-conditioned, 20/20 vision-guided picks, a 37× sample-efficiency world model, and 12/12 Nav2 goals.">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🦾</text></svg>">
+<title>Ahmed Sohail Butt — Portfolio</title>
+<meta name="description" content="Software engineering portfolio: backend and data platforms, applied LLM systems, and robotics/embodied AI. Every headline number links to the code behind it.">
+<meta property="og:title" content="Ahmed Sohail Butt — Portfolio">
+<meta property="og:description" content="Backend microservices, grounded LLM systems, and a five-part robot-learning series. Every headline number links to the code behind it.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🛠️</text></svg>">
 <style>
   :root {
     --bg: #fafaf8; --fg: #1a1a1a; --muted: #5c5c56; --card: #ffffff;
@@ -30,64 +30,57 @@
   a:hover { text-decoration: underline; }
   .wrap { max-width: 1020px; margin: 0 auto; padding: 0 20px; }
 
-  header { padding: 64px 0 40px; }
+  header { padding: 64px 0 36px; }
   header h1 { font-size: 2.1rem; letter-spacing: -0.02em; }
   header .role { color: var(--muted); margin-top: 6px; }
   .links { margin-top: 14px; display: flex; gap: 18px; flex-wrap: wrap; font-size: 0.95rem; }
 
   .thesis {
-    border-left: 3px solid var(--accent); padding: 4px 0 4px 18px; margin: 8px 0 48px;
+    border-left: 3px solid var(--accent); padding: 4px 0 4px 18px; margin: 8px 0 44px;
     max-width: 780px;
   }
-  .thesis h2 { font-size: 1.25rem; margin-bottom: 8px; letter-spacing: -0.01em; }
   .thesis p { color: var(--muted); }
-  .thesis p + p { margin-top: 8px; }
 
-  .card {
-    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
-    margin-bottom: 28px; overflow: hidden;
-    display: grid; grid-template-columns: 1fr 1fr;
+  .discipline { margin-bottom: 46px; }
+  .discipline > h2 {
+    font-size: 1.3rem; letter-spacing: -0.01em; margin-bottom: 4px;
   }
-  .card .media { background: #000; display: flex; align-items: center; min-height: 100%; }
-  .card .media img { width: 100%; height: 100%; object-fit: cover; display: block; }
-  .card .body { padding: 26px 28px; }
-  .part {
+  .discipline > .sub { color: var(--muted); font-size: 0.95rem; margin-bottom: 18px; max-width: 720px; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(310px, 100%), 1fr)); gap: 16px; }
+  .proj {
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    padding: 20px 22px; display: flex; flex-direction: column; gap: 10px;
+  }
+  .proj.feature { grid-column: 1 / -1; }
+  .proj h3 { font-size: 1.08rem; letter-spacing: -0.01em; }
+  .proj h3 span { color: var(--muted); font-weight: 400; }
+  .proj p { color: var(--muted); font-size: 0.92rem; }
+  .stack {
     font-family: var(--mono); font-size: 0.72rem; color: var(--chipfg);
     background: var(--chipbg); border-radius: 4px; padding: 2px 8px;
-    display: inline-block; margin-bottom: 10px; letter-spacing: 0.06em;
+    display: inline-block; letter-spacing: 0.05em; align-self: flex-start;
   }
-  .card h3 { font-size: 1.3rem; letter-spacing: -0.01em; }
-  .card h3 span { color: var(--muted); font-weight: 400; }
-  .card .tag { color: var(--muted); font-size: 0.95rem; margin: 6px 0 12px; }
-  .card p.desc { font-size: 0.95rem; margin-bottom: 14px; }
-  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
   .chips span {
-    font-family: var(--mono); font-size: 0.74rem; padding: 3px 9px;
-    border: 1px solid var(--line); border-radius: 999px; color: var(--fg);
-    background: var(--bg);
+    font-family: var(--mono); font-size: 0.72rem; color: var(--muted);
+    border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px;
   }
-  .card .cta { font-size: 0.9rem; display: flex; gap: 16px; flex-wrap: wrap; }
-  @media (max-width: 760px) {
-    .card { grid-template-columns: 1fr; }
-    .card .media img { max-height: 300px; }
-    header { padding: 40px 0 28px; }
-  }
+  .proj .go { margin-top: auto; padding-top: 6px; font-size: 0.9rem; display: flex; gap: 16px; flex-wrap: wrap; }
 
-  .research { margin: 52px 0; }
-  .research h2 { font-size: 1.25rem; margin-bottom: 16px; letter-spacing: -0.01em; }
-  .research ul { list-style: none; display: grid; gap: 12px; }
-  .research li {
-    border: 1px solid var(--line); border-radius: 10px; padding: 14px 18px;
-    background: var(--card); font-size: 0.95rem;
+  .oss {
+    border: 1px solid var(--line); border-radius: 12px; background: var(--card);
+    padding: 20px 22px; margin-bottom: 46px;
   }
-  .research li b { display: block; margin-bottom: 2px; }
-  .research li span { color: var(--muted); }
+  .oss h2 { font-size: 1.15rem; margin-bottom: 8px; }
+  .oss p { color: var(--muted); font-size: 0.93rem; }
+  .oss p + p { margin-top: 6px; }
 
   footer {
-    border-top: 1px solid var(--line); margin-top: 56px; padding: 28px 0 48px;
-    color: var(--muted); font-size: 0.9rem;
-    display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+    border-top: 1px solid var(--line); padding: 26px 0 56px; color: var(--muted);
+    font-size: 0.86rem;
   }
+  footer p + p { margin-top: 6px; }
 </style>
 </head>
 <body>
@@ -95,158 +88,111 @@
 
 <header>
   <h1>Ahmed Sohail Butt</h1>
-  <div class="role">Computer Science, Wilfrid Laurier University (2027) · software engineering → embodied AI</div>
+  <div class="role">Computer Science, Wilfrid Laurier University (expected Dec. 2027) · Waterloo, ON</div>
   <div class="links">
     <a href="https://github.com/ahmedsohail2003">GitHub</a>
     <a href="https://huggingface.co/ahmedsohail2003">Hugging Face</a>
+    <a href="https://www.linkedin.com/in/ahmed-sohail-6496b31b6/">LinkedIn</a>
     <a href="mailto:ahmedsohaill2003@gmail.com">ahmedsohaill2003@gmail.com</a>
   </div>
 </header>
 
 <section class="thesis">
-  <h2>One simulated industrial work-cell. Five ways to teach a robot.</h2>
-  <p>The <b>WorkCell series</b>: one robot (SO-ARM100 in MuJoCo), one manipulation
-  setting, taught five different ways — imitation learning, a vision-language-action
-  foundation model, classical 3D perception, reinforcement learning with a from-scratch
-  world model, and a ROS&nbsp;2 deployment layer with a C++ port. Every project publishes
-  its datasets and models, and reports failures as carefully as successes: corrected
-  measurement bugs, negative results with forensics, and a claim-by-claim paper
-  reproduction.</p>
-  <p>Stack: PyTorch · LeRobot · Hugging Face · MuJoCo · Stable-Baselines3 · ROS 2 · C++ · NumPy/SciPy</p>
+  <p>I build systems where correctness is checkable: payments with compensation flows, LLM pipelines that treat model output as untrusted input, and robot-learning experiments with honest measurement. Pick your section below; several projects appear in more than one, because real systems rarely fit one label.</p>
 </section>
 
-<article class="card">
-  <div class="media"><img src="https://raw.githubusercontent.com/ahmedsohail2003/workcell-partA-imitation/master/outputs/policy_success.gif" alt="ACT policy performing pick-and-place from pixels (front and wrist cameras)"></div>
-  <div class="body">
-    <span class="part">PART A · IMITATION LEARNING</span>
-    <h3>Sim2Cell <span>— ACT from pixels</span></h3>
-    <p class="tag">End-to-end imitation pipeline built from scratch: env → IK → scripted expert → LeRobot datasets → ACT → eval forensics.</p>
-    <p class="desc">A domain-randomization study where DR training turned out to be
-    regularization, not a tax: identical recipe, only the data changed, +27 points on
-    the nominal task. Includes two documented negative results — a temporal-ensembling
-    sign flip on multimodal data, and a targeted-data "coverage whack-a-mole" verified
-    episode-by-episode on a fixed eval seed.</p>
-    <div class="chips"><span>90% (45/50) from pixels</span><span>87–100% robust under DR</span><span>4 datasets + 3 models on 🤗</span><span>free-tier T4 training</span></div>
-    <div class="cta">
-      <a href="https://github.com/ahmedsohail2003/workcell-partA-imitation">Repository</a>
-      <a href="https://github.com/ahmedsohail2003/workcell-partA-imitation/blob/master/docs/ACT_REPRODUCTION.md">ACT reproduction report</a>
-      <a href="https://huggingface.co/ahmedsohail2003/act-so101-pickplace-dr">Best model</a>
+<section class="discipline">
+  <h2>Backend &amp; Data Platforms</h2>
+  <div class="sub">Services, schemas, and pipelines: Java/Spring microservices, TypeScript full-stack, and SQL-heavy data work.</div>
+  <div class="grid">
+    <div class="proj">
+      <span class="stack">TypeScript · Node/Express · React 19 · MySQL</span>
+      <h3><a href="https://github.com/ahmedsohail2003/ledgerlight">LedgerLight</a> <span>· procurement data platform</span></h3>
+      <p>Streaming two-pass ETL over 1.29M Government of Canada contract records; JWT auth and RBAC; an append-only audit log enforced by MySQL grants and proven by integration tests; six SQL red-flag indicators with CTEs and window functions.</p>
+      <div class="chips"><span>1.29M records</span><span>66 unit tests</span><span>red-team suite gates CI</span></div>
+      <div class="go"><a href="https://github.com/ahmedsohail2003/ledgerlight">Code</a></div>
+    </div>
+    <div class="proj">
+      <span class="stack">Java 21 · Spring Boot 3 · Docker · Kubernetes</span>
+      <h3><a href="https://github.com/ahmedsohail2003/transfer-platform">Transfer Platform</a> <span>· payments microservices</span></h3>
+      <p>Two independently deployable services with per-service data ownership, BigDecimal money, optimistic locking, and a compensating refund flow when a credit fails after a debit.</p>
+      <div class="chips"><span>45 JUnit/Mockito tests</span><span>kubeconform-validated manifests</span><span>NIST CSF threat model</span></div>
+      <div class="go"><a href="https://github.com/ahmedsohail2003/transfer-platform">Code</a></div>
+    </div>
+    <div class="proj">
+      <span class="stack">Python · T-SQL · Azure · .NET Blazor · Bicep</span>
+      <h3><a href="https://github.com/ahmedsohail2003/YPYW-Business-Intelligence">YPYW Business Intelligence</a> <span>· shipped client work</span></h3>
+      <p>The analytics platform behind my Summer 2025 data engineering internship: ETL ingest of 500+ estimates (~$7.4M tracked revenue) into Azure SQL, typed T-SQL view layers, and a Blazor reporting dashboard, provisioned as infrastructure-as-code.</p>
+      <div class="chips"><span>500+ estimates · ~$7.4M</span><span>22 functional requirements</span><span>synthetic demo data</span></div>
+      <div class="go"><a href="https://github.com/ahmedsohail2003/YPYW-Business-Intelligence">Code</a></div>
     </div>
   </div>
-</article>
+</section>
 
-<article class="card">
-  <div class="media"><img loading="lazy" src="https://raw.githubusercontent.com/ahmedsohail2003/workcell-partB-vla/master/outputs/smolvla_v2_episode.gif" alt="SmolVLA executing a language-conditioned pick-and-place"></div>
-  <div class="body">
-    <span class="part">PART B · VISION-LANGUAGE-ACTION</span>
-    <h3>TalkToTheCell <span>— SmolVLA fine-tune</span></h3>
-    <p class="tag">"Pick up the red block and place it in the blue tray" — a 450M VLA taken from 0% zero-shot to 90%, on a free Kaggle T4.</p>
-    <p class="desc">The headline is a controlled cross-architecture study: the identical
-    recovery-demo dataset moved the two architectures in <i>opposite</i> directions —
-    chunked-regression ACT fell 65→50 while SmolVLA's flow-matching action expert
-    learned both behavior modes and jumped 55→90. Same data; the architecture decides
-    whether behavioral diversity is signal or poison.</p>
-    <div class="chips"><span>0% → 55% → 90% (18/20)</span><span>language-conditioned</span><span>ACT −15 vs SmolVLA +35 on same data</span><span>12k steps on one T4</span></div>
-    <div class="cta">
-      <a href="https://github.com/ahmedsohail2003/workcell-partB-vla">Repository</a>
-      <a href="https://huggingface.co/ahmedsohail2003/smolvla-so101-pickplace-v2">Model (90%)</a>
+<section class="discipline">
+  <h2>AI &amp; LLM Systems</h2>
+  <div class="sub">The unglamorous half of applied AI: validation, fallbacks, provenance, and adversarial testing. Model output is untrusted input.</div>
+  <div class="grid">
+    <div class="proj">
+      <span class="stack">TypeScript · Gemini · MySQL</span>
+      <h3><a href="https://github.com/ahmedsohail2003/ledgerlight">LedgerLight</a> <span>· grounded LLM reporting</span></h3>
+      <p>Every numeric token in a generated brief must resolve through a JSON path into the evidence pack; every red flag must cite a fired SQL indicator; failures fall back to a deterministic report with provenance tags. An adversarial red-team suite gates CI on every push.</p>
+      <div class="chips"><span>grounding validator</span><span>32 bypass-attempt tests</span><span>deterministic fallback</span></div>
+      <div class="go"><a href="https://github.com/ahmedsohail2003/ledgerlight">Code</a></div>
+    </div>
+    <div class="proj">
+      <span class="stack">React 19 · TypeScript · Gemini · WebSockets</span>
+      <h3><a href="https://github.com/ahmedsohail2003/fleetline">FleetLine</a> <span>· schema-validated NL commands</span></h3>
+      <p>The LLM may only propose JSON against a schema; a hand-rolled validator checks every field against the live command vocabulary; exactly one corrective re-prompt quotes the precise error back; a second failure falls through to a deterministic grammar parser, with per-command provenance in the UI.</p>
+      <div class="chips"><span>189 Vitest tests</span><span>GRAMMAR/LLM provenance</span><span>one re-prompt, then fallback</span></div>
+      <div class="go"><a href="https://github.com/ahmedsohail2003/fleetline">Code</a></div>
+    </div>
+    <div class="proj">
+      <span class="stack">PyTorch · LeRobot · Hugging Face Hub</span>
+      <h3><a href="https://github.com/ahmedsohail2003/workcell-partA-imitation/blob/master/docs/ACT_REPRODUCTION.md">ACT Reproduction Study</a> <span>· ML evaluation discipline</span></h3>
+      <p>A claim-by-claim reproduction of the ACT paper (RSS 2023) with Wilson confidence intervals, disclosed confounds, explicit not-tested scoping, and an errata section correcting my own earlier numbers.</p>
+      <div class="chips"><span>Wilson 95% CIs</span><span>errata section</span><span>4 datasets + 5 models on 🤗</span></div>
+      <div class="go"><a href="https://github.com/ahmedsohail2003/workcell-partA-imitation/blob/master/docs/ACT_REPRODUCTION.md">Report</a> <a href="https://huggingface.co/ahmedsohail2003">Artifacts</a></div>
     </div>
   </div>
-</article>
+</section>
 
-<article class="card">
-  <div class="media"><img loading="lazy" src="https://raw.githubusercontent.com/ahmedsohail2003/workcell-partC-grasping/master/outputs/pipeline_demo.gif" alt="RGB-D perception pipeline picking cubes camera-to-tray"></div>
-  <div class="body">
-    <span class="part">PART C · CLASSICAL PERCEPTION</span>
-    <h3>GraspSight <span>— RGB-D → 6-DoF grasp</span></h3>
-    <p class="tag">Vision-guided picking with zero runtime ground truth — every geometric algorithm implemented from scratch in NumPy/SciPy.</p>
-    <p class="desc">Pinhole back-projection, RANSAC plane removal, DBSCAN clustering, and
-    symmetry-aware table-constrained ICP recover object pose from depth alone;
-    hand-eye extrinsics come from an industrial precision-sphere calibration routine
-    (0.32&nbsp;mm). A self-calibrating look-then-move executor closes the loop with a
-    slide-in grasp against 1.9&nbsp;mm of jaw clearance.</p>
-    <div class="chips"><span>20/20 camera-to-tray picks</span><span>0.58 mm ICP pose error</span><span>0.32 mm hand-eye calibration</span><span>no Open3D, no PCL</span></div>
-    <div class="cta">
-      <a href="https://github.com/ahmedsohail2003/workcell-partC-grasping">Repository</a>
+<section class="discipline">
+  <h2>Robotics &amp; Embodied AI</h2>
+  <div class="sub">One simulated industrial work-cell, five ways to teach a robot — plus the interfaces humans supervise them through.</div>
+  <div class="grid">
+    <div class="proj feature">
+      <span class="stack">PyTorch · LeRobot · MuJoCo · C++/Eigen · ROS 2</span>
+      <h3><a href="./workcell/">The WorkCell Series</a> <span>· five learning paradigms, one robot, honest measurement</span></h3>
+      <p>Imitation learning (ACT, 90% from pixels), VLA fine-tuning (SmolVLA 0&rarr;90% language-conditioned on a free T4), classical 6-DoF grasping from first principles (20/20 picks, 0.58 mm), RL with a from-scratch world model and CEM-MPC planner, and a ROS 2 deployment with SLAM + Nav2 and a C++ port at 0.000 mm parity.</p>
+      <div class="chips"><span>ACT 90% (45/50)</span><span>SmolVLA 0&rarr;90%</span><span>20/20 picks · 0.58 mm ICP</span><span>12/12 Nav2 goals</span><span>C++ 3.3&times; speedup</span></div>
+      <div class="go"><a href="./workcell/">Full series page</a> <a href="https://huggingface.co/ahmedsohail2003">Datasets &amp; models</a></div>
+    </div>
+    <div class="proj">
+      <span class="stack">React 19 · TypeScript · WebSockets · ROS 2</span>
+      <h3><a href="https://github.com/ahmedsohail2003/fleetline">FleetLine</a> <span>· supervised-autonomy console</span></h3>
+      <p>Fleet supervision for simulated AMRs: hand-rolled rosbridge v2 client with reconnect and subscription replay, a 60 fps interpolated canvas map over a 10 Hz backend, and per-robot emergency-stop lockouts.</p>
+      <div class="chips"><span>60 fps over 10 Hz</span><span>reconnect + replay proven by tests</span></div>
+      <div class="go"><a href="https://github.com/ahmedsohail2003/fleetline">Code</a></div>
+    </div>
+    <div class="proj">
+      <span class="stack">React · TypeScript · MediaPipe</span>
+      <h3><a href="https://github.com/ahmedsohail2003/handsignal">HandSignal</a> <span>· gesture control for a cobot cell</span></h3>
+      <p>On-device gesture recognition in the browser with a crane-signal vocabulary adapted from ASME B30.5, driving a simulated cobot through a safety state machine with dwell, debounce, and refractory stages.</p>
+      <div class="chips"><span>on-device ML</span><span>28 Vitest tests + CI</span><span>45 s scripted-replay integration test</span></div>
+      <div class="go"><a href="https://github.com/ahmedsohail2003/handsignal">Code</a></div>
     </div>
   </div>
-</article>
+</section>
 
-<article class="card">
-  <div class="media"><img loading="lazy" src="https://raw.githubusercontent.com/ahmedsohail2003/workcell-partD-rl/master/outputs/rollout_reach_ppo.gif" alt="RL policy driving the arm to randomized targets"></div>
-  <div class="body">
-    <span class="part">PART D · RL + WORLD MODELS</span>
-    <h3>PolicyForge <span>— model-free vs model-based</span></h3>
-    <p class="tag">PPO and SAC benchmarked against a from-scratch world model (PETS-style dynamics ensemble + CEM-MPC) on reach and contact-rich lift.</p>
-    <p class="desc">The learned world model hits 100% reach success from 8k environment
-    steps — 37× fewer interactions than PPO — reproducing the sample-efficiency
-    hierarchy that matters when robot time is the cost. Contact-rich lift was solved by
-    root-causing a reset bug and running a documented four-stage reward-design study
-    (<a href="https://raw.githubusercontent.com/ahmedsohail2003/workcell-partD-rl/master/outputs/rollout_lift_sac.gif">watch the lift-and-hold rollout</a>).</p>
-    <div class="chips"><span>100% reach @ 8k steps</span><span>37× fewer than PPO, 12× than SAC</span><span>lift: 3-seed SAC, mean 73%</span><span>4-stage reward study</span></div>
-    <div class="cta">
-      <a href="https://github.com/ahmedsohail2003/workcell-partD-rl">Repository</a>
-      <a href="https://raw.githubusercontent.com/ahmedsohail2003/workcell-partD-rl/master/outputs/curves_reach.png">Learning curves</a>
-    </div>
-  </div>
-</article>
-
-<article class="card">
-  <div class="media"><img loading="lazy" src="https://raw.githubusercontent.com/ahmedsohail2003/workcell-partE-ros2/master/media/nav2_goals.gif" alt="Nav2 navigating to goals on a self-built SLAM map"></div>
-  <div class="body">
-    <span class="part">PART E · ROS 2 + C++</span>
-    <h3>CellOps <span>— SLAM, Nav2, and a C++ service</span></h3>
-    <p class="tag">The deployment layer: autonomous mapping and navigation, plus Part C's pose estimator ported to C++ and served over ROS 2.</p>
-    <p class="desc">slam_toolbox maps the world under a closed-loop lidar-guided explorer,
-    then Nav2 + AMCL hits goals derived automatically from the map — fully scripted,
-    12/12 across two independent runs. The C++ port (from-scratch KD-tree, no PCL) is
-    numerically identical to the Python reference and 3.3× faster; nine silent-failure
-    modes found en route are documented in the build log.</p>
-    <div class="chips"><span>12/12 Nav2 goals</span><span>0.000 mm C++/Python parity</span><span>14.0 → 4.33 ms (3.3×)</span><span>9 failure modes documented</span></div>
-    <div class="cta">
-      <a href="https://github.com/ahmedsohail2003/workcell-partE-ros2">Repository</a>
-      <a href="https://github.com/ahmedsohail2003/workcell-partE-ros2/blob/master/docs/BUILD_LOG.md">Build log</a>
-    </div>
-  </div>
-</article>
-
-<section class="research">
-  <h2>Research & open source</h2>
-  <ul>
-    <li>
-      <b><a href="https://github.com/ahmedsohail2003/workcell-partA-imitation/blob/master/docs/ACT_REPRODUCTION.md">Reproducing ACT (Zhao et al., RSS 2023) on a $150-class arm</a></b>
-      <span>Claim-by-claim reproduction study with verdicts, Wilson CIs, and honest NOT-TESTED scoping —
-      including an extension the paper's regime never exhibits: temporal ensembling's benefit inverts
-      on multimodal data, and per-step replanning without aggregation collapses the policy to 5%.</span>
-    </li>
-    <li>
-      <b>Upstream fixes to <a href="https://github.com/huggingface/lerobot">LeRobot</a> (Windows)</b>
-      <span>Three bugs found, root-caused, and fixed while building Part A:
-      <a href="https://github.com/huggingface/lerobot/pull/4174">#4174</a> (POSIX-formed Hub patterns),
-      <a href="https://github.com/huggingface/lerobot/pull/4177">#4177</a> (torchcodec load guard), and an
-      independent Windows verification review of <a href="https://github.com/huggingface/lerobot/pull/4121">#4121</a>
-      (checkpoint symlink → junction fallback).</span>
-    </li>
-    <li>
-      <b><a href="https://huggingface.co/ahmedsohail2003">4 LeRobot datasets + 5 models on Hugging Face</a></b>
-      <span>Every headline number on this page is reproducible from public artifacts — including the
-      negative results, which ship with the same quality of model card as the successes.</span>
-    </li>
-    <li>
-      <b><a href="https://github.com/ahmedsohail2003/workcell-partA-imitation/discussions/1">Peer review welcome</a></b>
-      <span>Spotted a flaw, an overclaim, or something that wouldn't survive real hardware?
-      I'm actively collecting technical feedback in this open thread — blunt criticism appreciated.</span>
-    </li>
-  </ul>
+<section class="oss">
+  <h2>Open source</h2>
+  <p><strong>Hugging Face LeRobot</strong> — root-caused two Windows bugs (Hub path normalization, unsafe video-backend selection) and submitted upstream fixes with unit tests, currently under maintainer review: <a href="https://github.com/huggingface/lerobot/pull/4174">PR #4174</a> · <a href="https://github.com/huggingface/lerobot/pull/4177">PR #4177</a>, plus independent Windows verification of <a href="https://github.com/huggingface/lerobot/pull/4121">#4121</a>.</p>
 </section>
 
 <footer>
-  <div>© 2026 Ahmed Sohail Butt</div>
-  <div>
-    <a href="https://github.com/ahmedsohail2003">GitHub</a> ·
-    <a href="https://huggingface.co/ahmedsohail2003">Hugging Face</a> ·
-    <a href="mailto:ahmedsohaill2003@gmail.com">Email</a>
-  </div>
+  <p>Most of this portfolio was built January to August 2026, largely in intensive sessions with AI tooling in the loop. The standard I hold it to: I can explain and modify every algorithm in these repos, and the failure modes are documented as carefully as the wins.</p>
+  <p>Ahmed Sohail Butt · Waterloo, ON · <a href="mailto:ahmedsohaill2003@gmail.com">ahmedsohaill2003@gmail.com</a></p>
 </footer>
 
 </div>
