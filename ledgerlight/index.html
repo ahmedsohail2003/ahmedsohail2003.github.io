@@ -1,0 +1,829 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Ledgerlight: an audit platform that flags risky Government of Canada contracts and writes LLM briefs that can't make numbers up. By Ahmed Sohail Butt.">
+<meta name="theme-color" content="#0c0b0b">
+<title>Ledgerlight</title>
+<style>
+[hidden]{display:none!important}
+:root{
+  color-scheme:dark;
+  --bg:#0c0b0b;
+  --bg-2:#121011;
+  --surface:#161314;
+  --line:rgba(239,234,229,.09);
+  --line-2:rgba(239,234,229,.17);
+  --text:#efeae5;
+  --text-2:#cdc7c2;
+  --muted:#a29b97;
+  --faint:#857f7b;
+  --accent:#ff5a5f;
+  --accent-ink:#1c0a0b;
+  --accent-soft:rgba(255,90,95,.13);
+  --accent-line:rgba(255,90,95,.5);
+  --sans:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{background:var(--bg);-webkit-text-size-adjust:100%;text-size-adjust:100%;scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.55 var(--sans);-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;overflow-x:clip}
+a{color:inherit;text-underline-offset:3px;text-decoration-thickness:1px}
+:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:4px}
+.wrap{width:100%;max-width:1080px;margin-inline:auto;padding-inline:20px}
+
+/* top */
+.top{padding-block:16px 12px}
+.who{margin:0;display:flex;flex-direction:column;gap:4px}
+.nm{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:650;letter-spacing:-.01em}
+.nm::before{content:"";width:7px;height:7px;background:var(--accent);flex:none}
+.role{padding-left:15px;font:500 11px/1.35 var(--mono);color:var(--muted);letter-spacing:.01em}
+
+/* hero stage */
+.stage{position:relative;height:clamp(300px,92vw,540px);overflow:hidden;background:var(--bg)}
+.stage::before{content:"";position:absolute;inset:0;transition:opacity 1s ease;
+  background:
+    radial-gradient(30% 12% at 48% 52%,rgba(239,234,229,.14),transparent 70%),
+    radial-gradient(54% 34% at 48% 50%,rgba(255,90,95,.14),transparent 72%),
+    radial-gradient(90% 70% at 50% 45%,#161213,var(--bg) 75%)}
+.stage.gl-on::before{opacity:.4}
+.stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:pan-y;opacity:0;transition:opacity 1s ease;cursor:grab;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
+.stage canvas:active{cursor:grabbing}
+.stage.gl-on canvas{opacity:1}
+.stage::after{content:"";position:absolute;left:0;right:0;bottom:0;height:30%;background:linear-gradient(rgba(12,11,11,0),var(--bg) 90%);pointer-events:none}
+.hint{position:absolute;top:10px;right:20px;z-index:2;margin:0;font:500 10px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--faint);pointer-events:none;opacity:0;transition:opacity .6s .6s}
+.stage-meta{position:absolute;left:0;right:0;bottom:10px;z-index:2;display:flex;flex-direction:column;gap:8px;pointer-events:none;opacity:0;transition:opacity .6s .4s}
+.stage.gl-on .hint,.stage.gl-on .stage-meta{opacity:1}
+.cap{margin:0;font:500 12px/1.3 var(--mono);color:var(--text-2)}
+.legend{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:6px 14px;font:11px/1.2 var(--mono);color:var(--muted)}
+.legend li{display:inline-flex;align-items:center;gap:6px}
+.lg{display:inline-block;flex:none}
+.lg-flag{width:6px;height:6px;border-radius:50%;background:var(--accent);box-shadow:0 0 6px var(--accent)}
+.lg-node{width:9px;height:9px;border-radius:50%;border:1.5px solid var(--accent)}
+.lg-log{width:11px;height:6px;border:1px solid var(--text-2)}
+
+/* hero copy */
+.hero-copy{padding-block:2px 8px}
+h1{margin:0;font-size:clamp(46px,14.5vw,108px);line-height:.92;letter-spacing:-.045em;font-weight:760}
+h1 span{font-weight:300;letter-spacing:-.035em}
+.lede{margin:16px 0 0;max-width:30ch;font-size:clamp(18.5px,5vw,24px);line-height:1.38;letter-spacing:-.005em;color:var(--text-2);text-wrap:pretty}
+.chips{list-style:none;margin:22px 0 0;padding:0;display:flex;flex-wrap:wrap;gap:6px}
+.chips li{padding:7px 9px;font:500 12px/1 var(--mono);color:var(--text-2);border:1px solid var(--line-2);border-radius:4px;background:rgba(239,234,229,.02)}
+.cta{display:flex;flex-wrap:wrap;gap:10px;margin-top:24px}
+.btn{appearance:none;display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:46px;padding:0 18px;font:600 15px/1 var(--sans);color:var(--text);background:transparent;border:1px solid var(--line-2);border-radius:6px;text-decoration:none;cursor:pointer;transition:background-color .2s,border-color .2s,transform .1s}
+.btn:hover{border-color:var(--text-2)}
+.btn:active{transform:translateY(1px)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.primary:hover{background:#ff6f73;border-color:#ff6f73}
+.btn[disabled]{opacity:.55;cursor:default}
+.btn svg{flex:none}
+
+/* sections */
+.sec{border-top:1px solid var(--line);padding-block:60px}
+.label{margin:0 0 22px;display:flex;align-items:center;gap:10px;font:600 11.5px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.label::before{content:"";width:6px;height:6px;background:var(--accent);flex:none}
+.statement{margin:0;max-width:28ch;font-size:clamp(22px,6vw,34px);line-height:1.28;letter-spacing:-.018em;font-weight:560;text-wrap:pretty}
+.statement + .statement{margin-top:18px;color:var(--muted);font-weight:500}
+.n{font-family:var(--mono);font-weight:600;letter-spacing:-.03em}
+
+/* cards */
+.cards{display:grid;grid-template-columns:1fr;gap:12px}
+.card{display:flex;flex-direction:column;gap:10px;padding:20px 18px 16px;background:var(--surface);border:1px solid var(--line);border-radius:10px}
+.kind{font:600 10.5px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+.card h3{margin:0;font-size:19px;line-height:1.25;letter-spacing:-.012em;font-weight:650;text-wrap:balance}
+.card p{margin:0;font-size:15px;line-height:1.55;color:var(--text-2)}
+.card .stack{margin-top:auto;padding-top:12px;border-top:1px dashed var(--line-2);font:12px/1.5 var(--mono);color:var(--muted)}
+
+/* architecture */
+.arch{margin:0}
+.flow{display:flex;flex-direction:column}
+.node{display:grid;grid-template-columns:auto 1fr;column-gap:14px;align-items:start;padding:14px 16px;background:var(--bg-2);border:1px solid var(--line-2);border-radius:10px}
+.step{padding-top:2px;font:600 12px/1.4 var(--mono);color:var(--muted)}
+.node .t,.outcome .t{margin:0;font-size:16px;font-weight:650;line-height:1.35;letter-spacing:-.01em}
+.node .d,.outcome .d{margin:3px 0 0;font-size:13.5px;line-height:1.45;color:var(--muted)}
+.node.key{border-color:var(--accent-line);background:linear-gradient(var(--accent-soft),var(--accent-soft)),var(--bg-2)}
+.node.key .step{color:var(--accent)}
+.edge{position:relative;display:grid;grid-template-columns:1fr 1fr;min-height:54px}
+.edge::before{content:"";position:absolute;left:calc(50% - .5px);top:0;bottom:5px;width:1px;background:var(--line-2)}
+.edge::after{content:"";position:absolute;left:calc(50% - 4px);bottom:4px;width:8px;height:8px;border-right:1px solid var(--muted);border-bottom:1px solid var(--muted);transform:rotate(45deg)}
+.edge span{grid-column:2;align-self:center;padding:8px 0 8px 14px;font:11.5px/1.4 var(--mono);color:var(--muted)}
+.branch{display:block;width:100%;height:32px;color:var(--line-2)}
+.outcomes{display:grid;grid-template-columns:1fr 1fr}
+.outcome{margin-inline:5px;padding:12px 12px 13px;background:var(--bg-2);border:1px solid var(--line-2);border-radius:10px}
+.outcome .k{display:block;margin-bottom:8px;font:600 10.5px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.outcome .t{font-size:14.5px;line-height:1.3}
+.outcome .d{font-size:12.5px;line-height:1.4}
+.outcome.fail{border-color:var(--accent-line)}
+.outcome.fail .k{color:var(--accent)}
+.app{margin-top:30px;padding-top:20px;border-top:1px dashed var(--line-2)}
+.sub{margin:0 0 12px;font:600 10.5px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.app-row{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr) auto minmax(0,1fr);gap:6px;align-items:stretch}
+.app-box{min-width:0;padding:10px;background:var(--bg-2);border:1px solid var(--line-2);border-radius:8px}
+.app-box b{display:block;font-size:13.5px;font-weight:650;line-height:1.25}
+.app-box span{display:block;margin-top:4px;font:11px/1.35 var(--mono);color:var(--muted)}
+.arrow{align-self:center;font:13px/1 var(--mono);color:var(--muted)}
+.app-note{margin:12px 0 0;font-size:13.5px;line-height:1.5;color:var(--muted)}
+
+/* demo */
+.demo{margin-top:44px;padding:18px;background:var(--surface);border:1px solid var(--line-2);border-radius:12px;scroll-margin-top:16px}
+.demo-top{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
+.demo-top h3{margin:0;font-size:20px;font-weight:650;letter-spacing:-.015em}
+.sim{padding:6px 8px;font:600 10.5px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--accent);border:1px solid var(--accent-line);border-radius:4px}
+.demo-lede{margin:10px 0 16px;max-width:52ch;font-size:14px;line-height:1.5;color:var(--muted)}
+.demo-body{display:grid;gap:12px}
+.pane{min-width:0;background:var(--bg);border:1px solid var(--line);border-radius:8px}
+.pane-h{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line);font:600 10.5px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.json{margin:0;padding:12px 14px;overflow-x:auto;white-space:pre;font:12.5px/1.65 var(--mono);color:var(--text-2)}
+.jl{border-radius:3px;transition:background-color .35s,color .35s,box-shadow .35s}
+.jl.hit{color:var(--text);background:rgba(239,234,229,.15);box-shadow:0 0 0 3px rgba(239,234,229,.15)}
+.claims{list-style:none;margin:0;padding:14px;display:grid;gap:14px}
+.claim .s{margin:0;font-size:15.5px;line-height:1.5}
+.claim mark{padding:2px 5px;font:600 .93em/1 var(--mono);color:var(--text);background:rgba(239,234,229,.1);border-radius:3px;transition:background-color .3s,color .3s}
+.claim.checking mark{animation:probe .7s ease-in-out infinite}
+@keyframes probe{50%{background:rgba(239,234,229,.3)}}
+.claim.pass mark{background:rgba(239,234,229,.22)}
+.claim.fail mark{color:var(--accent);background:var(--accent-soft);text-decoration:line-through;text-decoration-thickness:1.5px}
+.res{margin:6px 0 0;min-height:18px;display:flex;align-items:flex-start;gap:6px;font:12px/1.5 var(--mono);color:var(--faint)}
+.res svg{flex:none;margin-top:2px}
+.res code{font:inherit;color:inherit;overflow-wrap:anywhere}
+.claim.pass .res{color:var(--text-2)}
+.claim.fail .res{color:var(--accent)}
+.badge{padding:5px 7px;font:600 10px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;white-space:nowrap;color:var(--text-2);border:1px solid var(--line-2);border-radius:4px;transition:background-color .3s,color .3s,border-color .3s}
+.badge.det{color:var(--accent-ink);background:var(--accent);border-color:var(--accent)}
+.report{margin:0 14px 14px;padding:12px;border:1px dashed var(--accent-line);border-radius:8px}
+.rh{margin:0 0 8px;font:600 10.5px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+.report p{margin:0;font-size:14px;line-height:1.5}
+.report p + p{margin-top:8px}
+.prov{display:inline-block;margin:3px 4px 0 0;padding:2px 6px;font:11px/1.35 var(--mono);color:var(--muted);border:1px solid var(--line-2);border-radius:3px;overflow-wrap:anywhere}
+.demo-actions{display:flex;align-items:center;flex-wrap:wrap;gap:12px 16px;margin-top:14px}
+.status{margin:0;flex:1 1 180px;font:12.5px/1.5 var(--mono);color:var(--muted)}
+
+/* proof */
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line-2);border:1px solid var(--line-2);border-radius:10px;overflow:hidden}
+.stat{min-width:0;display:flex;flex-direction:column;justify-content:space-between;gap:14px;padding:18px 16px 20px;background:var(--bg)}
+.stat .v{font:600 clamp(46px,14vw,76px)/.9 var(--mono);letter-spacing:-.05em;color:var(--text);font-variant-numeric:tabular-nums}
+.stat .l{font-size:13.5px;line-height:1.4;color:var(--muted)}
+.stat.wide{grid-column:1 / -1}
+.stat.wide .v{font-size:clamp(72px,24vw,128px)}
+.ledger{margin:24px 0 0;border-top:1px solid var(--line)}
+.ledger div{display:grid;grid-template-columns:78px 1fr;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}
+.ledger dt{font:600 10.5px/1.7 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.ledger dd{margin:0;font-size:14.5px;line-height:1.5;color:var(--text-2)}
+
+/* footer */
+.foot{border-top:1px solid var(--line);padding-block:56px 40px}
+.foot-name{margin:0;font-size:clamp(24px,6.6vw,40px);line-height:1.15;letter-spacing:-.02em;font-weight:650;text-wrap:balance}
+.foot-sub{margin:10px 0 0;font-size:14.5px;color:var(--muted)}
+.links{list-style:none;margin:28px 0 0;padding:0;display:grid;border-top:1px solid var(--line)}
+.links li{min-width:0;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 0;border-bottom:1px solid var(--line)}
+.kv{min-width:0;display:flex;flex-direction:column;gap:6px}
+.k{font:600 10.5px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.v{font:14.5px/1.4 var(--mono);color:var(--text);text-decoration:none;overflow-wrap:anywhere}
+a.v:hover{text-decoration:underline;text-decoration-color:var(--accent)}
+.copy{appearance:none;flex:none;min-height:38px;padding:0 12px;font:600 12px/1 var(--mono);letter-spacing:.04em;color:var(--text-2);background:transparent;border:1px solid var(--line-2);border-radius:5px;cursor:pointer}
+.copy:hover{border-color:var(--text-2)}
+.fine{margin:28px 0 0;font:11.5px/1.5 var(--mono);color:var(--muted)}
+
+@media (min-width:720px){
+  .cards{grid-template-columns:1fr 1fr}
+}
+@media (min-width:880px){
+  .sec{padding-block:96px}
+  .demo{padding:24px}
+  .demo-body{grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr)}
+  .stats{grid-template-columns:repeat(6,1fr)}
+  .stat.wide{grid-column:span 2}
+  .stat.wide .v{font-size:clamp(72px,9vw,112px)}
+  .links{grid-template-columns:repeat(3,1fr);column-gap:28px}
+}
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important;transition-delay:0s!important}
+}
+</style>
+</head>
+<body>
+<header class="top wrap">
+  <p class="who"><span class="nm">Ahmed Sohail Butt</span><span class="role">CS, Wilfrid Laurier · open to Winter 2027 co-op</span></p>
+</header>
+
+<main>
+  <section class="hero" aria-labelledby="h-title">
+    <div class="stage" id="stage">
+      <canvas id="scene" role="img" aria-label="Illustration: a slowly rotating galaxy of points stands in for contract records. A scanning plane sweeps through it; some points flare red and draw lines to six glowing indicator nodes, while an append-only ledger of translucent blocks grows beside it."></canvas>
+      <p class="hint" aria-hidden="true">Drag sideways to rotate</p>
+      <div class="stage-meta wrap">
+        <p class="cap">1.31M contract records, illustrated</p>
+        <ul class="legend" aria-label="Legend">
+          <li><i class="lg lg-flag"></i>flagged record</li>
+          <li><i class="lg lg-node"></i>6 indicators</li>
+          <li><i class="lg lg-log"></i>append-only log</li>
+        </ul>
+      </div>
+    </div>
+    <div class="wrap hero-copy">
+      <h1 id="h-title">Ledger<span>light</span></h1>
+      <p class="lede">An audit platform that flags risky Government of Canada contracts and writes LLM briefs that can't make numbers up.</p>
+      <ul class="chips" aria-label="Tech stack">
+        <li>TypeScript</li><li>Node.js</li><li>Express</li><li>React 19</li><li>MySQL</li><li>Gemini API</li><li>JWT</li><li>RBAC</li>
+      </ul>
+      <div class="cta">
+        <a class="btn primary" href="https://github.com/ahmedsohail2003/ledgerlight" target="_blank" rel="noopener noreferrer">View the repo <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 11L11 5M6 5h5v5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+        <a class="btn" href="#demo">Try the demo</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec" aria-labelledby="h-problem">
+    <div class="wrap">
+      <h2 class="label" id="h-problem">The problem</h2>
+      <p class="statement"><span class="n">1.31M</span> Government of Canada contract records are too many to review by hand, so the risky ones have to be surfaced systematically.</p>
+      <p class="statement">An LLM can draft the brief, but in an audit a single invented number is a liability.</p>
+    </div>
+  </section>
+
+  <section class="sec" aria-labelledby="h-built">
+    <div class="wrap">
+      <h2 class="label" id="h-built">What I built</h2>
+      <div class="cards">
+        <article class="card">
+          <span class="kind">Detection</span>
+          <h3>Six SQL red-flag indicators</h3>
+          <p>Parameterized rules over 1.31M contract records: non-competitive awards, single-bid competitions, amendment inflation, threshold splitting, repeat awards and buyer concentration.</p>
+          <div class="stack">MySQL · CTE · date-windowed self-join</div>
+        </article>
+        <article class="card">
+          <span class="kind">Grounding</span>
+          <h3>Briefs that can't make numbers up</h3>
+          <p>Gemini drafts each brief. Every number must resolve through a JSON path into the evidence pack and match its value, and every red flag must cite an indicator that actually fired. A failing draft is re-prompted with the exact reasons, up to 3 attempts, then replaced by a deterministic brief built only from the evidence.</p>
+          <div class="stack">Gemini API · Zod · JSON paths · provenance tags</div>
+        </article>
+        <article class="card">
+          <span class="kind">Data layer</span>
+          <h3>Least privilege, enforced by MySQL grants</h3>
+          <p>Three separated database identities: admin for migrations, a SELECT-only identity for everything the model touches, and an app identity that can only append to the audit log. An integration test connects as the app identity and is denied UPDATE and DELETE.</p>
+          <div class="stack">MySQL grants · integration test</div>
+        </article>
+        <article class="card">
+          <span class="kind">Workflow</span>
+          <h3>Human review board</h3>
+          <p>Analysts move cases through new, under review, substantiated or dismissed. Illegal transitions are rejected with a 409, every decision needs a written justification, and each move is audit-logged.</p>
+          <div class="stack">Express · JWT · RBAC · React 19</div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec" aria-labelledby="h-how">
+    <div class="wrap">
+      <h2 class="label" id="h-how">How it works</h2>
+      <figure class="arch">
+        <div class="flow">
+          <div class="node">
+            <span class="step">01</span>
+            <div><p class="t">Contract records</p><p class="d"><span class="n">1.31M</span> Government of Canada records</p></div>
+          </div>
+          <div class="edge"><span>streaming two-pass ETL, batched multi-row inserts</span></div>
+          <div class="node">
+            <span class="step">02</span>
+            <div><p class="t">MySQL</p><p class="d">3 separated identities · append-only audit log enforced by grants</p></div>
+          </div>
+          <div class="edge"><span>6 parameterized SQL red-flag indicators</span></div>
+          <div class="node">
+            <span class="step">03</span>
+            <div><p class="t">Evidence pack</p><p class="d">JSON: every number in a brief must come from here</p></div>
+          </div>
+          <div class="edge"><span>Gemini drafts the brief</span></div>
+          <div class="node key">
+            <span class="step">04</span>
+            <div><p class="t">Grounding validator</p><p class="d">numbers → JSON paths · red flags → fired indicators</p></div>
+          </div>
+          <svg class="branch" viewBox="0 0 100 32" preserveAspectRatio="none" aria-hidden="true"><path d="M50 0V14M25 14H75M25 14V32M75 14V32" fill="none" stroke="currentColor" stroke-width="1" vector-effect="non-scaling-stroke"/></svg>
+          <div class="outcomes">
+            <div class="outcome"><span class="k">pass</span><p class="t">Model brief</p><p class="d">every number traced to evidence</p></div>
+            <div class="outcome fail"><span class="k">fail</span><p class="t">Re-prompt, then fallback</p><p class="d">exact reasons fed back, up to 3 attempts; then a deterministic brief</p></div>
+          </div>
+        </div>
+        <div class="app">
+          <p class="sub">App layer</p>
+          <div class="app-row">
+            <div class="app-box"><b>React 19</b><span>front end</span></div>
+            <span class="arrow" aria-hidden="true">→</span>
+            <div class="app-box"><b>Express API</b><span>JWT · RBAC</span></div>
+            <span class="arrow" aria-hidden="true">→</span>
+            <div class="app-box"><b>MySQL</b><span>app identity</span></div>
+          </div>
+          <p class="app-note">Review board: illegal status transitions are rejected, and every decision needs a written justification.</p>
+        </div>
+      </figure>
+
+      <div class="demo" id="demo">
+        <div class="demo-top">
+          <h3>Grounding check</h3>
+          <span class="sim">Simulated demo</span>
+        </div>
+        <p class="demo-lede">Made-up evidence pack and brief, checked in your browser. Validate tries to resolve each highlighted number to a JSON path.</p>
+        <div class="demo-body">
+          <div class="pane">
+            <div class="pane-h"><span>Evidence pack</span><span>JSON</span></div>
+<pre class="json" aria-label="Simulated evidence pack">{
+  "vendor": {
+    "canonical_name": "Vendor A"
+  },
+  "profile": {
+    <span class="jl" id="jl-count">"contract_count": 7</span>,
+    "total_value": 212500,
+    "buyer_count": 2
+  }
+}</pre>
+          </div>
+          <div class="pane">
+            <div class="pane-h"><span>Brief</span><span class="badge" id="badge">Model draft</span></div>
+            <ol class="claims">
+              <li class="claim" id="claim1">
+                <p class="s">Vendor A holds <mark>7</mark> contracts in the loaded data.</p>
+                <p class="res" id="res1"><span>unchecked</span></p>
+              </li>
+              <li class="claim" id="claim2">
+                <p class="s">Its prices ran <mark>38%</mark> above comparable vendors.</p>
+                <p class="res" id="res2"><span>unchecked</span></p>
+              </li>
+            </ol>
+            <div class="report" id="report" hidden>
+              <p class="rh">Deterministic fallback brief</p>
+              <p>Vendor A holds 7 contracts worth $212,500 in the loaded data, across 2 buying organizations.<br><span class="prov">sql_derived</span><span class="prov">profile.contract_count</span><span class="prov">profile.total_value</span><span class="prov">profile.buyer_count</span></p>
+            </div>
+          </div>
+        </div>
+        <div class="demo-actions">
+          <button type="button" class="btn primary" id="validate">Validate</button>
+          <p class="status" id="status" aria-live="polite">2 numbers to check</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec" aria-labelledby="h-proof">
+    <div class="wrap">
+      <h2 class="label" id="h-proof">Proof</h2>
+      <div class="stats">
+        <div class="stat wide"><span class="v">1.31M</span><span class="l">Government of Canada contract records</span></div>
+        <div class="stat"><span class="v">6</span><span class="l">SQL red-flag indicators</span></div>
+        <div class="stat"><span class="v">66</span><span class="l">unit tests gate CI on every push to main</span></div>
+        <div class="stat"><span class="v">16</span><span class="l">red-team attacks, all rejected in CI</span></div>
+        <div class="stat"><span class="v">3</span><span class="l">separated DB identities</span></div>
+      </div>
+      <dl class="ledger">
+        <div><dt>Red team</dt><dd>16 seeded attack briefs, all rejected on every CI run, including invented or wrong figures, evidence-path tricks, scale-shorthand abuse, target laundering, and citations of rules that didn't fire or law that wasn't retrieved. 5 well-formed controls must still pass.</dd></div>
+        <div><dt>Validator</dt><dd>32 of the 66 unit tests exercise the grounding validator directly.</dd></div>
+        <div><dt>Grants</dt><dd>An integration test, run against a live MySQL, connects as the app identity and is denied UPDATE and DELETE on the audit log.</dd></div>
+      </dl>
+    </div>
+  </section>
+</main>
+
+<footer class="foot" id="contact">
+  <div class="wrap">
+    <p class="foot-name">Ahmed Sohail Butt · open to winter 2027 co-op</p>
+    <p class="foot-sub">Computer Science, Wilfrid Laurier University · graduating Dec 2027</p>
+    <ul class="links">
+      <li><span class="kv"><span class="k">Project</span><a class="v" href="https://github.com/ahmedsohail2003/ledgerlight" target="_blank" rel="noopener noreferrer">github.com/ahmedsohail2003/ledgerlight</a></span></li>
+      <li><span class="kv"><span class="k">GitHub</span><a class="v" href="https://github.com/ahmedsohail2003" target="_blank" rel="noopener noreferrer">github.com/ahmedsohail2003</a></span></li>
+      <li><span class="kv"><span class="k">Email</span><a class="v" id="email" href="mailto:ahmedsohaill2003@gmail.com">ahmedsohaill2003@gmail.com</a></span><button type="button" class="copy" id="copy-email">Copy</button></li>
+    </ul>
+    <p class="fine">The 3D hero is an illustration, not live data. Built from Three.js primitives.</p>
+  </div>
+</footer>
+
+<script>
+/* Grounding check (simulated) + copy email */
+(function () {
+  var btn = document.getElementById('validate');
+  if (btn) {
+    var c1 = document.getElementById('claim1'), c2 = document.getElementById('claim2');
+    var r1 = document.getElementById('res1'), r2 = document.getElementById('res2');
+    var badge = document.getElementById('badge'), report = document.getElementById('report');
+    var status = document.getElementById('status'), hit = document.getElementById('jl-count');
+    var OK = '<svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3.2 3.1L13 4.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    var NO = '<svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.2 4.2l7.6 7.6M11.8 4.2l-7.6 7.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
+    var init = { r1: r1.innerHTML, r2: r2.innerHTML, st: status.textContent };
+    var timers = [], state = 'idle';
+    var reduce = function () { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); };
+    var reset = function () {
+      timers.forEach(clearTimeout); timers = [];
+      c1.className = 'claim'; c2.className = 'claim';
+      r1.innerHTML = init.r1; r2.innerHTML = init.r2;
+      badge.textContent = 'Model draft'; badge.classList.remove('det');
+      report.hidden = true; hit.classList.remove('hit');
+      status.textContent = init.st; btn.textContent = 'Validate'; btn.disabled = false; state = 'idle';
+    };
+    var run = function () {
+      state = 'running'; btn.disabled = true;
+      var steps = [
+        function () { c1.classList.add('checking'); r1.innerHTML = '<span>resolving 7 …</span>'; status.textContent = 'Attempt 1 of 3: checking number 1 of 2'; },
+        function () { c1.classList.remove('checking'); c1.classList.add('pass'); hit.classList.add('hit'); r1.innerHTML = OK + '<span>pass: 7 = <code>profile.contract_count</code></span>'; },
+        function () { c2.classList.add('checking'); r2.innerHTML = '<span>resolving 38% …</span>'; status.textContent = 'Attempt 1 of 3: checking number 2 of 2'; },
+        function () { c2.classList.remove('checking'); c2.classList.add('fail'); r2.innerHTML = NO + '<span>fail: 38% has no declared figure in the evidence pack</span>'; status.textContent = 'Draft rejected. Re-prompting with the exact reason (attempt 2 of 3).'; },
+        function () { status.textContent = 'Attempts 2 and 3 are rejected too (simulated).'; },
+        function () { badge.textContent = 'Deterministic fallback'; badge.classList.add('det'); report.hidden = false; status.textContent = 'After 3 rejected drafts, the brief falls back to a deterministic version built only from the evidence pack.'; btn.textContent = 'Reset'; btn.disabled = false; state = 'done'; }
+      ];
+      var at = reduce() ? [0, 0, 0, 0, 0, 0] : [0, 700, 1300, 2000, 3100, 4200];
+      steps.forEach(function (fn, i) { timers.push(setTimeout(fn, at[i])); });
+    };
+    btn.addEventListener('click', function () { if (state === 'done') reset(); else if (state === 'idle') run(); });
+  }
+
+  var cb = document.getElementById('copy-email'), em = document.getElementById('email');
+  if (cb && em) {
+    var selectIt = function () {
+      try { var r = document.createRange(); r.selectNodeContents(em); var s = window.getSelection(); s.removeAllRanges(); s.addRange(r); } catch (e) {}
+      cb.textContent = 'Selected';
+    };
+    cb.addEventListener('click', function () {
+      var done = function () { cb.textContent = 'Copied'; setTimeout(function () { cb.textContent = 'Copy'; }, 1800); };
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(em.textContent.trim()).then(done, selectIt);
+        else selectIt();
+      } catch (e) { selectIt(); }
+    });
+  }
+})();
+</script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script>
+/* Hero scene: illustration only, not live data */
+(function () {
+  'use strict';
+  var stage = document.getElementById('stage');
+  var canvas = document.getElementById('scene');
+  if (!stage || !canvas) return;
+  var mq = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
+  var reduced = !!(mq && mq.matches);
+  var glOK = true;
+  function fallback() { glOK = false; stage.classList.remove('gl-on'); stage.classList.add('no-gl'); }
+
+  var T = window.THREE;
+  if (!T) { fallback(); return; }
+  var renderer;
+  try {
+    renderer = new T.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
+  } catch (err) { fallback(); return; }
+  if (!renderer || !renderer.getContext()) { fallback(); return; }
+
+  var DPR = Math.min(window.devicePixelRatio || 1, 2);
+  renderer.setPixelRatio(DPR);
+  renderer.setClearColor(0x000000, 0);
+
+  var scene = new T.Scene();
+  var camera = new T.PerspectiveCamera(36, 1, 0.1, 100);
+  var world = new T.Group(); scene.add(world);
+  var galaxy = new T.Group(); world.add(galaxy);
+
+  var CORAL = [1.0, 0.353, 0.373];
+  var R = 3.1;
+  var COUNT = Math.min(window.innerWidth, window.innerHeight) < 720 ? 2600 : 4000;
+
+  var PT_VS = [
+    'attribute float aSize;', 'attribute vec3 aColor;', 'uniform float uScale;', 'varying vec3 vColor;',
+    'void main(){', '  vColor = aColor;', '  vec4 mv = modelViewMatrix * vec4(position, 1.0);',
+    '  gl_Position = projectionMatrix * mv;', '  gl_PointSize = max(aSize * uScale / -mv.z, 1.0);', '}'
+  ].join('\n');
+  var PT_FS = [
+    'uniform float uOpacity;', 'varying vec3 vColor;',
+    'void main(){', '  float d = length(gl_PointCoord - vec2(0.5));',
+    '  float a = 1.0 - smoothstep(0.0, 0.5, d);', '  a = pow(a, 1.7);',
+    '  gl_FragColor = vec4(vColor, a * uOpacity);', '}'
+  ].join('\n');
+  var LN_VS = 'attribute vec3 aColor; varying vec3 vColor; void main(){ vColor = aColor; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }';
+  var LN_FS = 'varying vec3 vColor; void main(){ gl_FragColor = vec4(vColor, 1.0); }';
+  var PL_VS = 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }';
+  var PL_FS = [
+    'uniform float uAlpha;', 'varying vec2 vUv;',
+    'void main(){',
+    '  float side = smoothstep(0.0, 0.18, vUv.x) * (1.0 - smoothstep(0.82, 1.0, vUv.x));',
+    '  float vert = smoothstep(0.0, 0.5, vUv.y) * (1.0 - smoothstep(0.5, 1.0, vUv.y));',
+    '  float line = 1.0 - smoothstep(0.0, 0.022, abs(vUv.y - 0.5));',
+    '  float a = (0.10 * vert + 0.5 * line) * side * uAlpha;',
+    '  gl_FragColor = vec4(0.94, 0.92, 0.9, a);', '}'
+  ].join('\n');
+  function pointsMat() {
+    return new T.ShaderMaterial({ uniforms: { uScale: { value: 800 }, uOpacity: { value: 1 } }, vertexShader: PT_VS, fragmentShader: PT_FS, transparent: true, depthWrite: false, blending: T.AdditiveBlending });
+  }
+  function attr(geo, name, arr, size, dynamic) {
+    var a = new T.BufferAttribute(arr, size);
+    if (dynamic) a.setUsage(T.DynamicDrawUsage);
+    geo.setAttribute(name, a);
+    return a;
+  }
+
+  /* galaxy of records */
+  var gPos = new Float32Array(COUNT * 3), gCol = new Float32Array(COUNT * 3), gSize = new Float32Array(COUNT);
+  var cand = [];
+  var C_CORE = [1.0, 0.95, 0.9], C_MID = [0.86, 0.84, 0.82], C_OUT = [0.6, 0.6, 0.64];
+  function sgn() { return Math.random() < 0.5 ? -1 : 1; }
+  for (var i = 0; i < COUNT; i++) {
+    var x, y, z, u = Math.random(), inArm = false;
+    if (u < 0.1) {
+      var rb = Math.pow(Math.random(), 1.6) * 0.95, tb = Math.random() * Math.PI * 2;
+      x = Math.cos(tb) * rb; z = Math.sin(tb) * rb; y = (Math.random() - 0.5) * 0.46 * (1 - rb / 0.95);
+    } else if (u < 0.24) {
+      var rd = Math.sqrt(Math.random()) * R * 1.02, td = Math.random() * Math.PI * 2;
+      x = Math.cos(td) * rd; z = Math.sin(td) * rd; y = (Math.random() - 0.5) * 0.1;
+    } else {
+      inArm = true;
+      var ra = 0.3 + Math.pow(Math.random(), 1.2) * (R - 0.3);
+      var ta = (i % 3) / 3 * Math.PI * 2 + ra * 1.2;
+      var spread = 0.22 + ra * 0.13;
+      x = Math.cos(ta) * ra + Math.pow(Math.random(), 2.2) * sgn() * spread;
+      z = Math.sin(ta) * ra + Math.pow(Math.random(), 2.2) * sgn() * spread;
+      y = Math.pow(Math.random(), 2.5) * sgn() * 0.16;
+    }
+    var o = i * 3;
+    gPos[o] = x; gPos[o + 1] = y; gPos[o + 2] = z;
+    var rr = Math.min(Math.sqrt(x * x + z * z) / R, 1);
+    var c0 = rr < 0.35 ? C_CORE : C_MID, c1 = rr < 0.35 ? C_MID : C_OUT;
+    var f = rr < 0.35 ? rr / 0.35 : (rr - 0.35) / 0.65;
+    var b = 0.4 + Math.random() * 0.6;
+    gCol[o] = (c0[0] + (c1[0] - c0[0]) * f) * b;
+    gCol[o + 1] = (c0[1] + (c1[1] - c0[1]) * f) * b;
+    gCol[o + 2] = (c0[2] + (c1[2] - c0[2]) * f) * b;
+    gSize[i] = (0.034 + Math.random() * 0.044) * (Math.random() < 0.015 ? 2.2 : 1);
+    if (inArm && rr > 0.3 && rr < 0.97 && Math.random() < 0.035) cand.push(i);
+  }
+  var gGeo = new T.BufferGeometry();
+  attr(gGeo, 'position', gPos, 3); attr(gGeo, 'aColor', gCol, 3); attr(gGeo, 'aSize', gSize, 1);
+  var galMat = pointsMat();
+  galaxy.add(new T.Points(gGeo, galMat));
+
+  /* six indicator nodes */
+  var NODES = 6, RING_R = 1.7, RING_Y = 2.1;
+  var nodeBase = [], nodeNow = [], nodeHeat = new Float32Array(NODES), cores = [];
+  var coreGeo = new T.IcosahedronGeometry(0.075, 1), coreMat = new T.MeshBasicMaterial({ color: 0xff5a5f });
+  for (var k = 0; k < NODES; k++) {
+    var na = k / NODES * Math.PI * 2 + Math.PI / 6;
+    nodeBase.push(new T.Vector3(Math.cos(na) * RING_R, RING_Y, Math.sin(na) * RING_R));
+    nodeNow.push(nodeBase[k].clone());
+    var cm = new T.Mesh(coreGeo, coreMat); cm.position.copy(nodeBase[k]); world.add(cm); cores.push(cm);
+  }
+  var hPos = new Float32Array(NODES * 3), hCol = new Float32Array(NODES * 3), hSize = new Float32Array(NODES);
+  var hGeo = new T.BufferGeometry();
+  attr(hGeo, 'position', hPos, 3, true); attr(hGeo, 'aColor', hCol, 3, true); attr(hGeo, 'aSize', hSize, 1, true);
+  var haloMat = pointsMat();
+  var halos = new T.Points(hGeo, haloMat); halos.frustumCulled = false; world.add(halos);
+  var ringPos = new Float32Array(NODES * 3), ringGeo = new T.BufferGeometry();
+  attr(ringGeo, 'position', ringPos, 3, true);
+  var ring = new T.LineLoop(ringGeo, new T.LineBasicMaterial({ color: 0xff5a5f, transparent: true, opacity: 0.22, depthWrite: false }));
+  ring.frustumCulled = false; world.add(ring);
+
+  /* flares + lines (small pools) */
+  var POOL = 24;
+  var fPos = new Float32Array(POOL * 3), fCol = new Float32Array(POOL * 3), fSize = new Float32Array(POOL);
+  var fGeo = new T.BufferGeometry();
+  attr(fGeo, 'position', fPos, 3, true); attr(fGeo, 'aColor', fCol, 3, true); attr(fGeo, 'aSize', fSize, 1, true);
+  var flareMat = pointsMat();
+  var flarePts = new T.Points(fGeo, flareMat); flarePts.frustumCulled = false; world.add(flarePts);
+  var lPos = new Float32Array(POOL * 6), lCol = new Float32Array(POOL * 6);
+  var lGeo = new T.BufferGeometry();
+  attr(lGeo, 'position', lPos, 3, true); attr(lGeo, 'aColor', lCol, 3, true);
+  var lines = new T.LineSegments(lGeo, new T.ShaderMaterial({ vertexShader: LN_VS, fragmentShader: LN_FS, transparent: true, depthWrite: false, blending: T.AdditiveBlending }));
+  lines.frustumCulled = false; world.add(lines);
+  var flares = [];
+  for (var p = 0; p < POOL; p++) flares.push({ on: false, idx: 0, node: 0, t: 0, hit: false });
+
+  /* scanning plane */
+  var plane = new T.Mesh(new T.PlaneGeometry(1, 1.4), new T.ShaderMaterial({ uniforms: { uAlpha: { value: 0 } }, vertexShader: PL_VS, fragmentShader: PL_FS, transparent: true, depthWrite: false, side: T.DoubleSide, blending: T.AdditiveBlending }));
+  plane.rotation.y = Math.PI / 2;
+  world.add(plane);
+
+  /* append-only ledger */
+  var ledger = new T.Group(); ledger.position.set(3.0, 0, -2.2); world.add(ledger);
+  var BW = 0.95, BH = 0.12, BD = 0.7, GAP = 0.175, BASE = -0.6, VIS = 13, LPOOL = 17;
+  var boxGeo = new T.BoxGeometry(BW, BH, BD), edgeGeo = new T.EdgesGeometry(boxGeo);
+  var NEUTRAL = new T.Color(0xefeae5), HOT = new T.Color(0xff5a5f);
+  var blocks = [];
+  for (var j = 0; j < LPOOL; j++) {
+    var fm = new T.MeshBasicMaterial({ color: 0xefeae5, transparent: true, opacity: 0, depthWrite: false });
+    var lm = new T.LineBasicMaterial({ color: 0xefeae5, transparent: true, opacity: 0, depthWrite: false });
+    var grp = new T.Group(); grp.add(new T.Mesh(boxGeo, fm)); grp.add(new T.LineSegments(edgeGeo, lm));
+    grp.visible = false; ledger.add(grp);
+    blocks.push({ g: grp, fm: fm, lm: lm, seq: -1, y: 0, born: -99 });
+  }
+  var appended = 0, lastAppend = -10;
+  function slotY(seq) { return BASE + (seq - Math.max(0, appended - VIS)) * GAP; }
+  function append(now, instant) {
+    var pick = null, q;
+    for (q = 0; q < blocks.length; q++) if (blocks[q].seq < 0) { pick = blocks[q]; break; }
+    if (!pick) { pick = blocks[0]; for (q = 1; q < blocks.length; q++) if (blocks[q].seq < pick.seq) pick = blocks[q]; }
+    pick.seq = appended++;
+    pick.born = instant ? -99 : now;
+    pick.y = slotY(pick.seq) + (instant ? 0 : 0.8);
+    pick.g.position.y = pick.y;
+  }
+  for (var s0 = 0; s0 < 8; s0++) append(0, true);
+
+  function nearestNode(wx, wz) {
+    var best = 0, bd = 1e9;
+    for (var n = 0; n < NODES; n++) { var dx = nodeBase[n].x - wx, dz = nodeBase[n].z - wz, d = dx * dx + dz * dz; if (d < bd) { bd = d; best = n; } }
+    return best;
+  }
+  function trigger(idx, wx, wz, now, t0) {
+    for (var q = 0; q < POOL; q++) {
+      var fl = flares[q];
+      if (fl.on) continue;
+      fl.on = true; fl.idx = idx; fl.t = t0 || 0; fl.hit = false;
+      fl.node = Math.random() < 0.6 ? nearestNode(wx, wz) : Math.floor(Math.random() * NODES);
+      if (!t0 && now - lastAppend > 1.1) { append(now, false); lastAppend = now; }
+      return;
+    }
+  }
+
+  var time = 0, yaw = 0, yawVel = 0, dragging = false, lastX = 0, idle = 99, intro = 0;
+  var SW = R + 0.3, sweepX = -SW, prevSweep = -SW, SPEED = (2 * SW) / 5.4, rest = 0.6;
+  var LIFE = 2.2, DRAW = 0.4, ATTACK = 0.12;
+
+  function updateNodes(dt) {
+    for (var n = 0; n < NODES; n++) {
+      nodeHeat[n] *= Math.exp(-dt * 1.8);
+      var nb = nodeBase[n], nn = nodeNow[n];
+      nn.set(nb.x, nb.y + Math.sin(time * 0.9 + n * 1.3) * 0.05, nb.z);
+      cores[n].position.copy(nn);
+      cores[n].scale.setScalar(1 + Math.min(1, nodeHeat[n]) * 0.5);
+      var o3 = n * 3, h = 0.32 + Math.min(1, nodeHeat[n]) * 0.68;
+      hPos[o3] = nn.x; hPos[o3 + 1] = nn.y; hPos[o3 + 2] = nn.z;
+      hCol[o3] = CORAL[0] * h; hCol[o3 + 1] = CORAL[1] * h; hCol[o3 + 2] = CORAL[2] * h;
+      hSize[n] = 0.62 + Math.min(1, nodeHeat[n]) * 0.4;
+      ringPos[o3] = nn.x; ringPos[o3 + 1] = nn.y; ringPos[o3 + 2] = nn.z;
+    }
+    hGeo.attributes.position.needsUpdate = true; hGeo.attributes.aColor.needsUpdate = true; hGeo.attributes.aSize.needsUpdate = true;
+    ringGeo.attributes.position.needsUpdate = true;
+  }
+  function updateSweep(dt, cg, sg) {
+    if (rest > 0) { rest -= dt; plane.visible = false; return; }
+    plane.visible = true;
+    sweepX += SPEED * dt;
+    if (sweepX > SW) { sweepX = -SW; prevSweep = -SW; rest = 0.7; plane.visible = false; return; }
+    var prog = (sweepX + SW) / (2 * SW);
+    plane.material.uniforms.uAlpha.value = Math.pow(Math.sin(prog * Math.PI), 0.6);
+    plane.position.x = sweepX;
+    plane.scale.x = 2 * Math.sqrt(Math.max(R * R - sweepX * sweepX, 0.09)) + 0.5;
+    for (var c = 0; c < cand.length; c++) {
+      var gi = cand[c] * 3, lx = gPos[gi], lz = gPos[gi + 2];
+      var wx = lx * cg + lz * sg;
+      if (wx > prevSweep && wx <= sweepX && Math.random() < 0.5) trigger(cand[c], wx, -lx * sg + lz * cg, time, 0);
+    }
+    prevSweep = sweepX;
+  }
+  function updateFlares(dt, cg, sg) {
+    for (var q = 0; q < POOL; q++) {
+      var fl = flares[q], o3 = q * 3, o6 = q * 6, z6;
+      if (fl.on) { fl.t += dt; if (fl.t >= LIFE) fl.on = false; }
+      if (!fl.on) {
+        fSize[q] = 0; fCol[o3] = fCol[o3 + 1] = fCol[o3 + 2] = 0;
+        for (z6 = 0; z6 < 6; z6++) lCol[o6 + z6] = 0;
+        continue;
+      }
+      var gi = fl.idx * 3, lx = gPos[gi], ly = gPos[gi + 1], lz = gPos[gi + 2];
+      var wx = lx * cg + lz * sg, wy = ly, wz = -lx * sg + lz * cg;
+      var kk = fl.t < ATTACK ? fl.t / ATTACK : 1 - (fl.t - ATTACK) / (LIFE - ATTACK);
+      kk = Math.max(0, Math.min(1, kk));
+      var e = Math.min(1, fl.t / DRAW); e = 1 - Math.pow(1 - e, 3);
+      var nd = nodeNow[fl.node];
+      fPos[o3] = wx; fPos[o3 + 1] = wy; fPos[o3 + 2] = wz;
+      fCol[o3] = CORAL[0] * kk; fCol[o3 + 1] = CORAL[1] * kk; fCol[o3 + 2] = CORAL[2] * kk;
+      fSize[q] = 0.16 + 0.12 * kk;
+      lPos[o6] = wx; lPos[o6 + 1] = wy; lPos[o6 + 2] = wz;
+      lPos[o6 + 3] = wx + (nd.x - wx) * e; lPos[o6 + 4] = wy + (nd.y - wy) * e; lPos[o6 + 5] = wz + (nd.z - wz) * e;
+      var a0 = 0.9 * kk, a1 = 0.45 * kk;
+      lCol[o6] = CORAL[0] * a0; lCol[o6 + 1] = CORAL[1] * a0; lCol[o6 + 2] = CORAL[2] * a0;
+      lCol[o6 + 3] = CORAL[0] * a1; lCol[o6 + 4] = CORAL[1] * a1; lCol[o6 + 5] = CORAL[2] * a1;
+      if (!fl.hit && e >= 0.999) { fl.hit = true; nodeHeat[fl.node] = Math.min(1.5, nodeHeat[fl.node] + 0.8); }
+    }
+    fGeo.attributes.position.needsUpdate = true; fGeo.attributes.aColor.needsUpdate = true; fGeo.attributes.aSize.needsUpdate = true;
+    lGeo.attributes.position.needsUpdate = true; lGeo.attributes.aColor.needsUpdate = true;
+  }
+  function updateLedger(dt) {
+    var ease = 1 - Math.exp(-dt * 6);
+    for (var q = 0; q < blocks.length; q++) {
+      var bl = blocks[q];
+      if (bl.seq < 0) continue;
+      var ty = slotY(bl.seq);
+      bl.y = dt > 0 ? bl.y + (ty - bl.y) * ease : ty;
+      bl.g.position.y = bl.y;
+      var fade = T.MathUtils.smoothstep(bl.y, BASE - GAP * 2.6, BASE);
+      var age = time - bl.born;
+      var fin = Math.min(1, Math.max(0, age / 0.4));
+      var hot = Math.max(0, 1 - age / 1.8);
+      bl.fm.opacity = (0.045 + 0.12 * hot) * fade * fin;
+      bl.lm.opacity = (0.38 + 0.45 * hot) * fade * fin;
+      bl.fm.color.copy(NEUTRAL).lerp(HOT, hot);
+      bl.lm.color.copy(NEUTRAL).lerp(HOT, hot);
+      bl.g.visible = fade * fin > 0.002;
+    }
+  }
+  function update(dt) {
+    time += dt;
+    if (intro < 1) { intro = Math.min(1, intro + dt / 1.4); galMat.uniforms.uOpacity.value = intro; }
+    galaxy.rotation.y += dt * 0.075;
+    if (!dragging) {
+      yaw += yawVel * dt * 60; yawVel *= Math.pow(0.9, dt * 60);
+      idle += dt;
+      if (idle > 4) { var tgt = Math.round(yaw / (Math.PI * 2)) * Math.PI * 2; yaw += (tgt - yaw) * (1 - Math.exp(-dt * 0.8)); }
+    }
+    world.rotation.y = yaw;
+    var cg = Math.cos(galaxy.rotation.y), sg = Math.sin(galaxy.rotation.y);
+    updateNodes(dt);
+    updateSweep(dt, cg, sg);
+    updateFlares(dt, cg, sg);
+    updateLedger(dt);
+  }
+
+  /* static composition for reduced motion */
+  function staticPose() {
+    intro = 1; galMat.uniforms.uOpacity.value = 1;
+    rest = 0; sweepX = 0.85; prevSweep = 0.85; yawVel = 0;
+    var cg = Math.cos(galaxy.rotation.y), sg = Math.sin(galaxy.rotation.y), q;
+    for (q = 0; q < POOL; q++) flares[q].on = false;
+    for (q = 0; q < 10 && cand.length; q++) {
+      var ci = cand[Math.floor(q * cand.length / 10)], gi = ci * 3;
+      trigger(ci, gPos[gi] * cg + gPos[gi + 2] * sg, -gPos[gi] * sg + gPos[gi + 2] * cg, time, 0.55 + q * 0.03);
+    }
+    while (appended < 11) append(time, true);
+  }
+
+  /* camera fit: keeps galaxy + ledger in frame at any aspect */
+  var target = new T.Vector3(0.1, 0.7, 0), ELEV = T.MathUtils.degToRad(27);
+  function fit() {
+    var tanV = Math.tan(T.MathUtils.degToRad(camera.fov) / 2), tanH = tanV * camera.aspect;
+    var dist = Math.max(3.75 / tanH, 3.0 / tanV);
+    var lift = dist * tanV * 0.07;
+    camera.position.set(target.x, target.y - lift + Math.sin(ELEV) * dist, target.z + Math.cos(ELEV) * dist);
+    camera.lookAt(target.x, target.y - lift, target.z);
+  }
+
+  var running = false, raf = 0, lastT = 0, pending = false, inView = true;
+  function frame(t) {
+    raf = requestAnimationFrame(frame);
+    var dt = Math.min(0.05, Math.max(0, (t - lastT) / 1000)); lastT = t;
+    update(dt);
+    renderer.render(scene, camera);
+  }
+  function start() { if (running) return; running = true; lastT = performance.now(); raf = requestAnimationFrame(frame); }
+  function stop() { running = false; cancelAnimationFrame(raf); }
+  function renderOnce() { update(0); renderer.render(scene, camera); }
+  function requestRender() {
+    if (running || pending) return;
+    pending = true;
+    requestAnimationFrame(function () { pending = false; if (glOK) renderOnce(); });
+  }
+  function sync() { if (glOK && !reduced && !document.hidden && inView) start(); else stop(); }
+
+  function resize() {
+    var w = Math.max(1, stage.clientWidth), h = Math.max(1, stage.clientHeight);
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    fit();
+    camera.updateProjectionMatrix();
+    var sc = (h * DPR) / (2 * Math.tan(T.MathUtils.degToRad(camera.fov) / 2));
+    galMat.uniforms.uScale.value = sc; haloMat.uniforms.uScale.value = sc; flareMat.uniforms.uScale.value = sc;
+    if (!running && glOK) renderOnce();
+  }
+
+  /* horizontal drag rotates; vertical swipes scroll (touch-action: pan-y) */
+  canvas.addEventListener('pointerdown', function (e) {
+    dragging = true; lastX = e.clientX; yawVel = 0; idle = 0;
+    try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
+  });
+  canvas.addEventListener('pointermove', function (e) {
+    if (!dragging) return;
+    var d = (e.clientX - lastX) * 0.0085; lastX = e.clientX;
+    yaw += d; yawVel = reduced ? 0 : d * 0.6; idle = 0;
+    if (!running) requestRender();
+  });
+  function endDrag() { dragging = false; idle = 0; }
+  canvas.addEventListener('pointerup', endDrag);
+  canvas.addEventListener('pointercancel', endDrag);
+  canvas.addEventListener('lostpointercapture', endDrag);
+
+  canvas.addEventListener('webglcontextlost', function (e) { e.preventDefault(); stop(); fallback(); });
+  document.addEventListener('visibilitychange', sync);
+  if ('IntersectionObserver' in window) {
+    new IntersectionObserver(function (entries) { inView = entries[0].isIntersecting; sync(); }).observe(stage);
+  }
+  if (mq) {
+    var onMotion = function (e) { reduced = e.matches; if (reduced) { stop(); staticPose(); if (glOK) renderOnce(); } else sync(); };
+    if (mq.addEventListener) mq.addEventListener('change', onMotion); else if (mq.addListener) mq.addListener(onMotion);
+  }
+
+  try {
+    if (reduced) staticPose();
+    resize();
+    if ('ResizeObserver' in window) new ResizeObserver(resize).observe(stage); else window.addEventListener('resize', resize);
+    renderOnce();
+    stage.classList.add('gl-on');
+    sync();
+  } catch (err) { stop(); fallback(); }
+})();
+</script>
+</body>
+</html>
