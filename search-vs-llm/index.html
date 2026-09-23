@@ -1,0 +1,906 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0A0A0B">
+<meta name="description" content="Multi-Agent Adversarial AI: a four-agent benchmark pitting classic game-tree search against a Gemini-powered player. Built by Ahmed Sohail Butt.">
+<title>Search vs LLM Benchmark</title>
+<style>
+:root{
+  color-scheme:dark;
+  --bg:#0A0A0B;
+  --surface:#111113;
+  --surface-2:#17171A;
+  --line:#232326;
+  --line-2:#34343A;
+  --text:#EDEDEF;
+  --soft:#C9C9CE;
+  --muted:#9B9BA3;
+  --faint:#7A7A82;
+  --accent:#EDEDEF;
+  --accent-soft:rgba(237,237,239,.07);
+  --accent-line:rgba(237,237,239,.26);
+  --on-accent:#0A0A0B;
+  --sans:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;
+  --g:20px;
+  --maxw:1120px;
+  background:var(--bg);
+}
+@media (min-width:720px){:root{--g:32px}}
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%;background:var(--bg)}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:16px;line-height:1.55;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+h1,h2,h3,p,figure,dl,dd,ol,ul{margin:0}
+ol,ul{padding:0;list-style:none}
+a{color:var(--text);text-decoration-color:var(--accent-line);text-decoration-thickness:1px;text-underline-offset:3px}
+a:hover{text-decoration-color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:3px}
+.n{font-family:var(--mono);font-size:.93em;letter-spacing:-.01em;font-variant-numeric:tabular-nums}
+.page{overflow-x:hidden;overflow-x:clip}
+.wrap{width:100%;max-width:var(--maxw);margin-inline:auto;padding-inline:var(--g)}
+
+/* ---------- hero ---------- */
+.hero{max-width:var(--maxw);margin-inline:auto;padding-inline:var(--g)}
+.topbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 12px;padding-block:14px 12px}
+.who{font-size:14px;font-weight:600;letter-spacing:.005em}
+.status{display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--soft);white-space:nowrap}
+.status i{width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.stage{position:relative;height:clamp(300px,86vw,540px);margin-inline:calc(var(--g) * -1);overflow:hidden;
+  background:radial-gradient(60% 55% at 50% 46%,rgba(237,237,239,.08),rgba(237,237,239,0) 72%),linear-gradient(180deg,#101012,var(--bg));
+  -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+.stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:pan-y;cursor:grab}
+.stage canvas:active{cursor:grabbing}
+.stage.is-fallback{height:200px}
+.stage.is-fallback canvas,.stage.is-fallback .hud{display:none}
+.hud{position:absolute;inset:0;pointer-events:none;font-family:var(--mono);font-size:11px;line-height:1.45;color:var(--muted)}
+.hud-phase{position:absolute;left:var(--g);top:12px;display:grid}
+.hud-phase b{color:var(--text);font-weight:600;letter-spacing:.1em}
+.hud-count{position:absolute;right:var(--g);top:12px;display:grid;justify-items:end;font-variant-numeric:tabular-nums}
+.hud-count .row{display:flex;gap:10px}
+.hud-count .v{min-width:3ch;text-align:right;color:var(--muted)}
+.hud-count .ab .v{color:var(--text);font-weight:600}
+.hud-note{font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
+.hud-hint{position:absolute;left:0;right:0;bottom:12px;text-align:center;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);transition:opacity .5s}
+.hero-copy{display:grid;gap:18px;padding-block:26px 4px}
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+h1{font-size:clamp(42px,11.6vw,78px);line-height:.98;letter-spacing:-.035em;font-weight:700}
+h1 .l{display:block}
+h1 .vs{font-family:var(--mono);font-size:.4em;font-weight:500;letter-spacing:0;color:var(--muted);vertical-align:.62em;margin-inline:.06em}
+.lede{font-size:17px;line-height:1.55;color:var(--soft);max-width:40ch;text-wrap:pretty}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chips li{font-family:var(--mono);font-size:12px;line-height:1;color:var(--text);background:var(--surface);border:1px solid var(--line-2);border-radius:4px;padding:7px 9px}
+.cta{justify-self:start;display:inline-flex;align-items:center;gap:10px;margin-top:4px;padding:12px 16px;border-radius:6px;background:var(--accent);color:var(--on-accent);font-size:15px;font-weight:650;text-decoration:none}
+.cta svg{width:16px;height:16px;flex:none}
+.cta:hover{background:#FFFFFF}
+@media (min-width:900px){
+  .hero{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.08fr);grid-template-areas:"top top" "copy stage";column-gap:56px}
+  .topbar{grid-area:top;padding-block:22px 18px}
+  .hero-copy{grid-area:copy;align-self:center;padding-block:0}
+  .stage{grid-area:stage;margin-inline:0;height:560px;border:1px solid var(--line);border-radius:14px}
+  .hud-phase{left:20px;top:16px}.hud-count{right:20px;top:16px}
+  h1{font-size:clamp(44px,5.2vw,66px)}
+  .lede{font-size:19px}
+}
+
+/* ---------- sections ---------- */
+.section{padding-block:64px 0}
+.label{display:flex;align-items:center;gap:10px;margin-bottom:22px;font-family:var(--mono);font-size:12px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:var(--soft)}
+.label::before{content:"";flex:none;width:7px;height:7px;border-radius:50%;background:var(--muted)}
+.statement{font-size:clamp(21px,5.4vw,34px);line-height:1.36;letter-spacing:-.012em;font-weight:500;max-width:32ch;text-wrap:pretty}
+.statement span{color:var(--muted)}
+
+.cards{display:grid;gap:12px}
+@media (min-width:720px){.cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.card{display:grid;gap:10px;align-content:start;padding:20px 18px 22px;background:var(--surface);border:1px solid var(--line);border-radius:10px}
+.card.mine{border-color:var(--accent-line)}
+.card .k{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.card h3{font-size:18px;line-height:1.3;font-weight:650;letter-spacing:-.01em;text-wrap:balance}
+.card p{font-size:15px;line-height:1.55;color:var(--muted);text-wrap:pretty}
+
+/* ---------- architecture ---------- */
+.how{display:grid;gap:16px}
+@media (min-width:900px){.how{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:24px;align-items:start}}
+.arch{position:relative;padding:18px 14px 30px;border:1px dashed var(--line-2);border-radius:12px}
+.lanes{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.45fr);gap:14px}
+.lane{display:flex;flex-direction:column;min-width:0}
+.lane.own{padding-right:22px}
+.lane-h{margin-bottom:10px;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);white-space:nowrap}
+.lane-h span{color:var(--text)}
+.stack{display:flex;flex-direction:column;gap:8px}
+.box{display:flex;align-items:center;min-height:38px;padding:8px 11px;background:var(--surface);border:1px solid var(--line-2);border-radius:6px;font-size:13.5px;line-height:1.25}
+.own .box{border-color:var(--accent-line)}
+.vline,.stem{position:relative;width:1.5px;margin-inline:auto;background:var(--line-2)}
+.vline{flex:none;height:16px}
+.stem{flex:1 1 auto;min-height:22px;margin-top:10px}
+.vline::after,.stem::after{content:"";position:absolute;left:50%;bottom:0;transform:translateX(-50%);border-left:4px solid transparent;border-right:4px solid transparent;border-top:5px solid var(--line-2)}
+.own .vline,.own .stem{background:var(--accent-line)}
+.own .vline::after,.own .stem::after{border-top-color:var(--accent-line)}
+.cycle{position:relative;display:flex;flex-direction:column}
+.loop{position:absolute;right:-17px;top:19px;width:13px;height:54px;border:1.5px solid var(--accent);border-left:0;border-radius:0 8px 8px 0}
+.loop::before{content:"";position:absolute;left:-6px;top:-3.75px;border-top:4.5px solid transparent;border-bottom:4.5px solid transparent;border-right:6px solid var(--accent)}
+.gate{display:block;padding:6px}
+.gate-cells{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px}
+.gate-cells span{padding:7px 0;border-radius:4px;background:var(--accent-soft);font-family:var(--mono);font-size:11px;line-height:1;text-align:center;color:var(--accent)}
+.gate-note{padding:8px 3px 2px;font-family:var(--mono);font-size:10.5px;line-height:1.45;color:var(--muted)}
+.gate-note b{font-weight:500;color:var(--text)}
+.board{justify-content:space-between;gap:10px;font-weight:600}
+.board small{font-family:var(--mono);font-size:10.5px;font-weight:400;color:var(--muted);text-align:right}
+.metrics{display:block;padding:12px 12px 14px}
+.m-h{margin-bottom:8px;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
+.metrics ul{display:flex;flex-wrap:wrap;gap:6px}
+.metrics li{padding:4px 7px;border:1px solid var(--line-2);border-radius:4px;font-family:var(--mono);font-size:11px;color:var(--soft)}
+.arch-ci{position:absolute;left:14px;bottom:-9px;padding:0 8px;background:var(--bg);font-family:var(--mono);font-size:11px;line-height:18px;color:var(--muted);white-space:nowrap}
+
+/* ---------- demo ---------- */
+.demo{display:grid;gap:16px;padding:18px 16px 16px;background:var(--surface);border:1px solid var(--line);border-radius:12px}
+.demo.instant *{transition:none!important}
+.demo-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px}
+.demo-head h3{font-size:17px;font-weight:650;letter-spacing:-.01em}
+.badge{padding:4px 7px;border:1px solid var(--accent-line);border-radius:4px;font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+.token-lane{position:relative;height:30px;margin-bottom:8px}
+.token{position:absolute;left:0;top:0;width:20%;height:100%;display:flex;align-items:center;justify-content:center;transition:transform .45s cubic-bezier(.45,0,.2,1)}
+.token span{max-width:calc(100% - 2px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:7px 4px;border-radius:4px;background:var(--accent);color:var(--on-accent);font-family:var(--mono);font-size:11px;line-height:1;transition:opacity .3s,transform .3s,background-color .3s,color .3s}
+.token.fail span{background:transparent;color:var(--text);box-shadow:inset 0 0 0 1px var(--muted);text-decoration:line-through}
+.token.gone span{opacity:0;transform:translateY(8px)}
+.token.fb span{background:var(--surface-2);color:var(--text);box-shadow:inset 0 0 0 1px var(--soft)}
+.cells{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px}
+.cell{display:grid;justify-items:center;gap:7px;padding:9px 2px 8px;background:var(--bg);border:1px solid var(--line-2);border-radius:6px;transition:border-color .25s}
+.cell .lbl{font-family:var(--mono);font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.cell .st{height:16px;display:grid;place-items:center;font-family:var(--mono);font-size:11px;color:var(--faint)}
+.cell .st svg{width:16px;height:16px}
+.cell[data-s="ok"]{border-color:var(--accent-line)}
+.cell[data-s="ok"] .st{color:var(--accent)}
+.cell[data-s="fail"]{border-style:dashed;border-color:var(--soft)}
+.cell[data-s="fail"] .st,.cell[data-s="active"] .st{color:var(--text)}
+.cell[data-s="active"]{border-color:var(--soft)}
+.counters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 16px}
+.ctr{display:flex;align-items:baseline;justify-content:space-between;gap:8px;padding-block:8px;border-top:1px solid var(--line);font-size:12.5px;color:var(--muted)}
+.ctr dd{font-family:var(--mono);color:var(--text);font-variant-numeric:tabular-nums}
+.log{min-height:176px;padding:11px 12px;background:var(--bg);border:1px solid var(--line);border-radius:8px;font-family:var(--mono);font-size:11.5px;line-height:1.65;color:var(--soft)}
+.log li{display:grid;grid-template-columns:2.6ch minmax(0,1fr);gap:8px}
+.log .a{color:var(--faint)}
+.log q{color:var(--text)}
+.log .ok{color:var(--muted)}
+.log .no{color:var(--text);font-weight:600}
+.log .done{color:var(--text)}
+.log .sys{color:var(--muted)}
+.actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.btn{display:grid;gap:3px;align-content:center;min-height:52px;padding:10px 12px;text-align:left;font:inherit;font-size:13.5px;font-weight:600;line-height:1.25;color:var(--text);background:var(--surface-2);border:1px solid var(--line-2);border-radius:8px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.btn small{font-family:var(--mono);font-size:10.5px;font-weight:400;color:var(--muted)}
+.btn:hover{border-color:var(--muted)}
+.btn[aria-pressed="true"]{border-color:var(--soft)}
+.btn:active{transform:translateY(1px)}
+.fine{font-size:12px;line-height:1.5;color:var(--faint)}
+
+/* ---------- proof ---------- */
+.stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.stat{display:grid;gap:10px;align-content:start;padding:18px 16px 20px;background:var(--surface);border:1px solid var(--line);border-radius:12px}
+.stat.lead{grid-column:1 / -1;padding:22px 20px 20px}
+.num{font-family:var(--mono);font-weight:500;font-size:48px;line-height:1;letter-spacing:-.04em;font-variant-numeric:tabular-nums;color:var(--text)}
+.lead .num{font-size:clamp(68px,22vw,128px);letter-spacing:-.05em;color:var(--accent)}
+.num .pct{font-size:.55em;letter-spacing:0;margin-left:.04em}
+.cap{font-size:14px;line-height:1.45;color:var(--muted)}
+.lead .cap{font-size:16px;color:var(--soft)}
+.delta{display:grid;gap:6px;margin-top:6px;padding-top:14px;border-top:1px solid var(--line)}
+.fx{display:flex;align-items:baseline;gap:10px;font-family:var(--mono);font-size:22px;letter-spacing:-.02em}
+.fx .from{color:var(--muted)}
+.fx .arr{font-size:.8em;color:var(--faint)}
+@media (min-width:900px){.stats{grid-template-columns:2fr 1fr 1fr}.stat.lead{grid-column:auto}}
+
+/* ---------- footer ---------- */
+.foot{display:grid;gap:22px;padding-block:80px 44px}
+.sign{font-size:clamp(22px,5.6vw,32px);line-height:1.25;font-weight:650;letter-spacing:-.015em;text-wrap:balance}
+.sign span{color:var(--muted)}
+.school{margin-top:-12px;font-size:14px;color:var(--muted)}
+.links{border-top:1px solid var(--line)}
+.links > div{display:grid;grid-template-columns:4.6rem minmax(0,1fr);gap:12px;align-items:baseline;padding-block:14px;border-bottom:1px solid var(--line)}
+.links dt{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
+.links dd{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 12px;min-width:0;font-family:var(--mono);font-size:13.5px;overflow-wrap:anywhere}
+.copy{padding:5px 8px;font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);background:transparent;border:1px solid var(--accent-line);border-radius:4px;cursor:pointer}
+.foot .fine{max-width:60ch}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{transition-duration:0s!important;animation-duration:0s!important;animation-iteration-count:1!important}
+}
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="hero">
+    <div class="topbar">
+      <span class="who">Ahmed Sohail Butt</span>
+      <span class="status"><i aria-hidden="true"></i>Open to winter <span class="n">2027</span> co-op</span>
+    </div>
+
+    <div class="stage" id="stage">
+      <canvas id="scene" role="img" aria-label="Illustration: minimax expands a game tree, then alpha-beta prunes whole subtrees"></canvas>
+      <div class="hud" aria-hidden="true">
+        <div class="hud-phase"><b id="hudPhase">ALPHA-BETA</b><span id="hudSub">same move, fewer nodes</span></div>
+        <div class="hud-count">
+          <span class="hud-note">nodes · illustrative</span>
+          <span class="row"><span>minimax</span><span class="v" id="hudMM">121</span></span>
+          <span class="row ab"><span>alpha-beta</span><span class="v" id="hudAB">37</span></span>
+        </div>
+        <div class="hud-hint" id="hudHint">drag sideways to rotate</div>
+      </div>
+    </div>
+
+    <div class="hero-copy">
+      <p class="eyebrow">Multi-Agent Adversarial AI</p>
+      <h1><span class="l">Search <span class="vs">vs</span> LLM</span><span class="l">Benchmark</span></h1>
+      <p class="lede">A four-agent benchmark pitting classic game-tree search against a Gemini-powered player, where every LLM move is validated before it touches the board.</p>
+      <ul class="chips" aria-label="Tech stack">
+        <li>Python</li><li>Gemini API</li><li>Minimax</li><li>Alpha-Beta pruning</li><li>GitHub Actions</li>
+      </ul>
+      <a class="cta" href="https://github.com/ahmedsohail2003/Multi-Agent-Adversarial-Game" target="_blank" rel="noopener">View the repository
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 11L11 5M6.5 5H11v4.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="section" aria-labelledby="h-problem">
+      <h2 class="label" id="h-problem">The problem</h2>
+      <p class="statement">Ask a language model for a move and the reply may not parse, may point off the board, or may break the rules. <span>Benchmarking it against classic search means checking every move before it is played, and measuring every agent in numbers that can be compared.</span></p>
+    </section>
+
+    <section class="section" aria-labelledby="h-built">
+      <h2 class="label" id="h-built">What I built</h2>
+      <div class="cards">
+        <article class="card mine">
+          <p class="k">My part</p>
+          <h3>I owned the LLM agent</h3>
+          <p>Prompt construction, response validation, corrective re-prompting and evaluation for the Gemini-powered player, in a team of four.</p>
+        </article>
+        <article class="card">
+          <p class="k">Validation</p>
+          <h3>Nothing unchecked reaches the board</h3>
+          <p>Every model move must pass parse, bounds and legality checks. A failure triggers a corrective re-prompt; repeated failure falls back to a deterministic move.</p>
+        </article>
+        <article class="card">
+          <p class="k">Instrumentation</p>
+          <h3>Counters on every agent</h3>
+          <p>Search-node counters across all four agents, plus LLM metrics for real API requests, first-try validity and retries.</p>
+        </article>
+        <article class="card">
+          <p class="k">Testing</p>
+          <h3>A regression test caught my own bug</h3>
+          <p>It exposed under-pruning in the benchmark. The fix raised measured node reduction from <span class="n">94.4%</span> to <span class="n">96.7%</span> versus plain minimax. The Python test suite runs on GitHub Actions CI.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" aria-labelledby="h-how">
+      <h2 class="label" id="h-how">How it works</h2>
+      <div class="how">
+        <figure class="arch" aria-label="Architecture: four agents play on one board; the LLM agent's moves pass a three-gate check first">
+          <div class="lanes">
+            <div class="lane">
+              <p class="lane-h">Classic agents</p>
+              <div class="stack">
+                <div class="box">Simple player</div>
+                <div class="box">Minimax</div>
+                <div class="box">Alpha-Beta</div>
+              </div>
+              <div class="stem"></div>
+            </div>
+            <div class="lane own">
+              <p class="lane-h">LLM agent · <span>my part</span></p>
+              <div class="box">Prompt construction</div>
+              <div class="vline"></div>
+              <div class="cycle">
+                <div class="box">Gemini API</div>
+                <div class="vline"></div>
+                <div class="box gate">
+                  <div class="gate-cells"><span>Parse</span><span>Bounds</span><span>Legal</span></div>
+                  <p class="gate-note"><b>fail</b> → corrective re-prompt<br><b>repeated fail</b> → deterministic fallback</p>
+                </div>
+                <div class="loop" aria-hidden="true"></div>
+              </div>
+              <div class="stem"></div>
+            </div>
+          </div>
+          <div class="box board">Board <small>moves from all four agents</small></div>
+          <div class="vline"></div>
+          <div class="box metrics">
+            <p class="m-h">Metrics</p>
+            <ul>
+              <li>search nodes · every agent</li><li>API requests</li><li>first-try validity</li><li>retries</li>
+            </ul>
+          </div>
+          <p class="arch-ci">Python test suite · GitHub Actions CI</p>
+        </figure>
+
+        <div class="demo" id="demo">
+          <div class="demo-head">
+            <h3>LLM move gate</h3>
+            <span class="badge">Simulated demo</span>
+          </div>
+          <div class="track">
+            <div class="token-lane"><div class="token" id="token"><span>(3, 1)</span></div></div>
+            <ol class="cells" id="cells">
+              <li class="cell"><span class="lbl">Reply</span><span class="st"></span></li>
+              <li class="cell"><span class="lbl">Parse</span><span class="st"></span></li>
+              <li class="cell"><span class="lbl">Bounds</span><span class="st"></span></li>
+              <li class="cell"><span class="lbl">Legal</span><span class="st"></span></li>
+              <li class="cell"><span class="lbl">Board</span><span class="st"></span></li>
+            </ol>
+          </div>
+          <dl class="counters">
+            <div class="ctr"><dt>API requests</dt><dd id="cReq">0</dd></div>
+            <div class="ctr"><dt>First-try valid</dt><dd id="cFirst">—</dd></div>
+            <div class="ctr"><dt>Retries</dt><dd id="cRetry">0</dd></div>
+            <div class="ctr"><dt>Fallback</dt><dd id="cFb">no</dd></div>
+          </dl>
+          <ol class="log" id="log"></ol>
+          <div class="actions">
+            <button class="btn" type="button" id="runRetry" data-run="retry">Run: illegal move<small>re-prompt, then legal</small></button>
+            <button class="btn" type="button" id="runFallback" data-run="fallback">Run: repeated failure<small>deterministic fallback</small></button>
+          </div>
+          <p class="fine">Simulated in the browser. Replies and attempt counts are illustrative.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" aria-labelledby="h-proof">
+      <h2 class="label" id="h-proof">Proof</h2>
+      <div class="stats">
+        <div class="stat lead">
+          <p class="num">96.7<span class="pct">%</span></p>
+          <p class="cap">node reduction vs plain minimax</p>
+          <div class="delta">
+            <p class="fx"><span class="from">94.4%</span><span class="arr" aria-label="to">→</span><span class="to">96.7%</span></p>
+            <p class="cap">up from <span class="n">94.4%</span> after the bug fix, caught by a regression test in my own benchmark</p>
+          </div>
+        </div>
+        <div class="stat">
+          <p class="num">4</p>
+          <p class="cap">agents: simple player, minimax, alpha-beta, Gemini</p>
+        </div>
+        <div class="stat">
+          <p class="num">3</p>
+          <p class="cap">gates on every model move: parse, bounds, legality</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="wrap foot">
+    <p class="sign">Ahmed Sohail Butt · <span>open to winter <span class="n">2027</span> co-op</span></p>
+    <p class="school">Computer Science, Wilfrid Laurier University · graduating Dec <span class="n">2027</span></p>
+    <dl class="links">
+      <div><dt>GitHub</dt><dd><a href="https://github.com/ahmedsohail2003" target="_blank" rel="noopener">github.com/ahmedsohail2003</a></dd></div>
+      <div><dt>Email</dt><dd><a id="email" href="mailto:ahmedsohaill2003@gmail.com">ahmedsohaill2003@gmail.com</a><button class="copy" type="button" id="copyEmail">Copy</button></dd></div>
+      <div><dt>Project</dt><dd><a href="https://github.com/ahmedsohail2003/Multi-Agent-Adversarial-Game" target="_blank" rel="noopener">github.com/ahmedsohail2003/<wbr>Multi-Agent-Adversarial-Game</a></dd></div>
+    </dl>
+    <p class="fine">The 3D scene is an illustration, not live data; its node counts are illustrative. The figures under Proof are the project's measured results.</p>
+  </footer>
+</div>
+
+<script>
+/* ---------- copy email ---------- */
+(() => {
+  const btn = document.getElementById('copyEmail');
+  const link = document.getElementById('email');
+  const addr = 'ahmedsohaill2003@gmail.com';
+  const flash = text => { btn.textContent = text; setTimeout(() => { btn.textContent = 'Copy'; }, 1600); };
+  const select = () => {
+    const r = document.createRange(); r.selectNodeContents(link);
+    const s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+    flash('Selected');
+  };
+  btn.addEventListener('click', () => {
+    try {
+      navigator.clipboard.writeText(addr).then(() => flash('Copied'), select);
+    } catch (e) { select(); }
+  });
+})();
+
+/* ---------- simulated move-gate demo ---------- */
+(() => {
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const demo = document.getElementById('demo');
+  const cells = Array.from(document.querySelectorAll('#cells .cell'));
+  const token = document.getElementById('token');
+  const chip = token.firstElementChild;
+  const log = document.getElementById('log');
+  const out = { req: document.getElementById('cReq'), first: document.getElementById('cFirst'), retry: document.getElementById('cRetry'), fb: document.getElementById('cFb') };
+  const buttons = Array.from(demo.querySelectorAll('[data-run]'));
+  const IDX = { reply: 0, parse: 1, bounds: 2, legal: 3, board: 4 };
+  const ICON = {
+    ok: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    fail: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
+    idle: '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="2" fill="currentColor"/></svg>'
+  };
+  const SCRIPTS = {
+    retry: [
+      { t: 'reply', text: '(2, 5)' },
+      { t: 'gate', k: 'parse', ok: true },
+      { t: 'gate', k: 'bounds', ok: true },
+      { t: 'gate', k: 'legal', ok: false },
+      { t: 'reprompt' },
+      { t: 'reply', text: '(3, 1)' },
+      { t: 'gate', k: 'parse', ok: true },
+      { t: 'gate', k: 'bounds', ok: true },
+      { t: 'gate', k: 'legal', ok: true },
+      { t: 'board' }
+    ],
+    fallback: [
+      { t: 'reply', text: '(2, 5)' },
+      { t: 'gate', k: 'parse', ok: true },
+      { t: 'gate', k: 'bounds', ok: true },
+      { t: 'gate', k: 'legal', ok: false },
+      { t: 'reprompt' },
+      { t: 'reply', text: 'Let me think step by step…', chip: 'Let me…' },
+      { t: 'gate', k: 'parse', ok: false },
+      { t: 'reprompt' },
+      { t: 'reply', text: '(-1, 4)' },
+      { t: 'gate', k: 'parse', ok: true },
+      { t: 'gate', k: 'bounds', ok: false },
+      { t: 'fallback' },
+      { t: 'board', fallback: true }
+    ]
+  };
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  let st;
+
+  function setCell(k, s, text) {
+    const c = cells[IDX[k]];
+    c.dataset.s = s;
+    c.lastElementChild.innerHTML = text != null ? esc(text) : (ICON[s] || ICON.idle);
+  }
+  function place(i, jump) {
+    if (jump) {
+      token.style.transition = 'none';
+      token.style.transform = 'translateX(' + i * 100 + '%)';
+      void token.offsetWidth;
+      token.style.transition = '';
+    } else {
+      token.style.transform = 'translateX(' + i * 100 + '%)';
+    }
+  }
+  function line(a, html) {
+    const li = document.createElement('li');
+    li.innerHTML = '<span class="a">' + a + '</span><span>' + html + '</span>';
+    log.appendChild(li);
+    return li.lastElementChild;
+  }
+  function counters() {
+    out.req.textContent = st.req;
+    out.first.textContent = st.first;
+    out.retry.textContent = st.retries;
+    out.fb.textContent = st.fb;
+  }
+  function reset() {
+    st = { attempt: 0, req: 0, retries: 0, first: '—', fb: 'no', cur: null };
+    log.textContent = '';
+    Object.keys(IDX).forEach(k => setCell(k, 'idle'));
+    token.className = 'token gone';
+    place(0, true);
+    counters();
+  }
+  function apply(s) {
+    if (s.t === 'reply') {
+      st.attempt++; st.req++;
+      ['parse', 'bounds', 'legal', 'board'].forEach(k => setCell(k, 'idle'));
+      place(0, true);
+      token.className = 'token';
+      chip.textContent = s.chip || s.text;
+      setCell('reply', 'active', 'A' + st.attempt);
+      st.cur = line('A' + st.attempt, '<q>' + esc(s.text) + '</q>');
+    } else if (s.t === 'gate') {
+      place(IDX[s.k]);
+      setCell(s.k, s.ok ? 'ok' : 'fail');
+      if (!s.ok) token.classList.add('fail');
+      st.cur.insertAdjacentHTML('beforeend', ' <span class="' + (s.ok ? 'ok' : 'no') + '">' + s.k + (s.ok ? ' ✓' : ' ✗') + '</span>');
+      if (st.attempt === 1 && (!s.ok || s.k === 'legal')) st.first = s.ok ? 'yes' : 'no';
+    } else if (s.t === 'reprompt') {
+      st.retries++;
+      token.classList.add('gone');
+      line('', '<span class="sys">↺ corrective re-prompt</span>');
+    } else if (s.t === 'fallback') {
+      st.fb = 'yes';
+      token.classList.add('gone');
+      line('', '<span class="sys">repeated failure → deterministic fallback</span>');
+    } else if (s.t === 'board') {
+      if (s.fallback) { place(3, true); chip.textContent = 'fallback'; token.className = 'token fb'; }
+      else token.className = 'token';
+      place(4);
+      setCell('board', 'ok');
+      line('', '<span class="done">' + (s.fallback ? 'fallback move applied to board' : 'move applied to board') + '</span>');
+    }
+    counters();
+  }
+
+  let runId = 0;
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  async function run(name, instant) {
+    const id = ++runId;
+    buttons.forEach(b => b.setAttribute('aria-pressed', String(b.dataset.run === name)));
+    if (instant) demo.classList.add('instant');
+    reset();
+    for (const s of SCRIPTS[name]) {
+      if (id !== runId) return;
+      apply(s);
+      if (!instant) await wait(reduce ? 420 : (s.t === 'reprompt' || s.t === 'fallback') ? 850 : s.t === 'reply' ? 700 : 600);
+    }
+    if (instant) requestAnimationFrame(() => requestAnimationFrame(() => demo.classList.remove('instant')));
+  }
+  buttons.forEach(b => b.addEventListener('click', () => run(b.dataset.run)));
+  run('retry', true);
+  log.setAttribute('aria-live', 'polite');
+})();
+
+/* ---------- Three.js hero: minimax expands, alpha-beta prunes ---------- */
+(() => {
+  const stage = document.getElementById('stage');
+  const canvas = document.getElementById('scene');
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const hud = {
+    phase: document.getElementById('hudPhase'), sub: document.getElementById('hudSub'),
+    mm: document.getElementById('hudMM'), ab: document.getElementById('hudAB'), hint: document.getElementById('hudHint')
+  };
+  let dead = false;
+  const fallback = () => { if (!dead) { dead = true; stage.classList.add('is-fallback'); } };
+
+  function webglOK() {
+    try {
+      const c = document.createElement('canvas');
+      const gl = c.getContext('webgl') || c.getContext('experimental-webgl');
+      if (!gl) return false;
+      const ext = gl.getExtension('WEBGL_lose_context');
+      if (ext) ext.loseContext();
+      return true;
+    } catch (e) { return false; }
+  }
+  function load(src) {
+    return new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = src; s.async = true;
+      s.onload = () => (window.THREE ? resolve(window.THREE) : reject(new Error('THREE missing')));
+      s.onerror = () => { s.remove(); reject(new Error('load failed: ' + src)); };
+      document.head.appendChild(s);
+    });
+  }
+  if (!webglOK()) { fallback(); return; }
+
+  // Pinned builds: jsDelivr first, cdnjs as a second source.
+  const SOURCES = [
+    'https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.min.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js'
+  ];
+  const timeout = setTimeout(fallback, 12000);
+  (async () => {
+    let T = null;
+    for (const src of SOURCES) { try { T = await load(src); break; } catch (e) { /* try next */ } }
+    clearTimeout(timeout);
+    if (!T || dead) { fallback(); return; }
+    try { start(T); } catch (e) { console.error(e); fallback(); }
+  })();
+
+  function start(THREE) {
+    /* --- tree: branching 3, depth 4 (121 nodes), laid out as a cone --- */
+    const B = 3, D = 4;
+    const RAD = [0, 0.95, 1.62, 2.08, 2.38];
+    const YS = [1.62, 0.84, 0.06, -0.72, -1.5];
+    const SIZE = [0.62, 0.5, 0.43, 0.36, 0.29];
+    const nodes = [];
+    (function build(parent, depth, a0, a1) {
+      const id = nodes.length, a = (a0 + a1) / 2;
+      nodes.push({ id, parent, depth, kids: [], x: Math.cos(a) * RAD[depth], y: YS[depth], z: Math.sin(a) * RAD[depth],
+        type: 0, visited: false, cut: -1, mmT: 0, abT: 1e9, pruneT: 1e9, cutT: 1e9, pv: false });
+      if (parent >= 0) nodes[parent].kids.push(id);
+      if (depth < D) {
+        const w = (a1 - a0) / B;
+        for (let i = 0; i < B; i++) build(id, depth + 1, a0 + i * w, a0 + (i + 1) * w);
+      }
+    })(-1, 0, -Math.PI / 2, Math.PI * 1.5);
+    const N = nodes.length;
+
+    /* --- timeline (seconds) --- */
+    const MM0 = 0.35, MM_STEP = 0.026, GROW = 0.3;
+    nodes.forEach(n => { n.mmT = MM0 + n.id * MM_STEP; });           // minimax: depth-first, every node
+    const MM_END = MM0 + (N - 1) * MM_STEP + GROW;
+    const DIM0 = MM_END + 0.6, DIM = 0.55;
+    const AB0 = DIM0 + DIM + 0.15, AB_STEP = 0.082, PRUNE = 0.85;
+    // Alpha-beta with ideal move ordering visits the "minimal tree";
+    // CUT nodes (type 2) stop after their first child and prune the rest.
+    nodes[0].type = 1;
+    let tick = 0;
+    (function visit(id) {
+      const n = nodes[id];
+      n.visited = true; n.abT = AB0 + tick * AB_STEP; tick += 1;
+      if (!n.kids.length) return;
+      if (n.type === 2) {
+        nodes[n.kids[0]].type = 3; visit(n.kids[0]);
+        const t = AB0 + tick * AB_STEP; tick += 1.6;
+        n.cutT = t;
+        n.kids.slice(1).forEach(function mark(j) { nodes[j].cut = id; nodes[j].pruneT = t; nodes[j].kids.forEach(mark); });
+      } else {
+        n.kids.forEach((k, i) => { nodes[k].type = (n.type === 1 && i === 0) ? 1 : 2; visit(k); });
+      }
+    })(0);
+    const AB_END = AB0 + tick * AB_STEP + PRUNE;
+    for (let id = 0; ; id = nodes[id].kids[0]) { nodes[id].pv = true; if (!nodes[id].kids.length) break; }
+    const PV0 = AB_END + 0.3, OUT0 = PV0 + 2.6, LOOP = OUT0 + 1.1;
+
+    // minimax nodes light grey; alpha-beta lights what it visits; pruned stays dim
+    const WHITE = [0.72, 0.72, 0.75], GREY = [0.24, 0.24, 0.26], LIT = [0.97, 0.97, 0.98], BRIGHT = [1.0, 1.0, 1.0];
+
+    /* --- renderer --- */
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: false, powerPreference: 'low-power' });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setClearColor(0x0a0a0b, 1);
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 60);
+    const tree = new THREE.Group();
+    scene.add(tree);
+    const dyn = (arr, size) => { const a = new THREE.BufferAttribute(arr, size); a.setUsage(THREE.DynamicDrawUsage); return a; };
+
+    // faint neutral haze, fades to the page colour at the canvas edges
+    const bgMat = new THREE.ShaderMaterial({
+      uniforms: { uRes: { value: new THREE.Vector2(1, 1) } },
+      vertexShader: 'void main(){gl_Position=vec4(position.xy,0.0,1.0);}',
+      fragmentShader: [
+        'uniform vec2 uRes;',
+        'void main(){',
+        '  vec2 uv=gl_FragCoord.xy/uRes;',
+        '  vec2 q=uv-vec2(0.5,0.54); q.x*=uRes.x/uRes.y;',
+        '  float g=exp(-dot(q,q)*4.5);',
+        '  float m=smoothstep(0.0,0.2,uv.x)*(1.0-smoothstep(0.8,1.0,uv.x))*smoothstep(0.0,0.2,uv.y)*(1.0-smoothstep(0.8,1.0,uv.y));',
+        '  gl_FragColor=vec4(vec3(0.0392,0.0392,0.0431)+vec3(0.93,0.93,0.95)*g*m*0.035,1.0);',
+        '}'
+      ].join('\n'),
+      depthTest: false, depthWrite: false
+    });
+    const bg = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), bgMat);
+    bg.frustumCulled = false; bg.renderOrder = -1;
+    scene.add(bg);
+
+    // nodes: one Points draw call, glow drawn in the shader
+    const pPos = new Float32Array(N * 3), pCol = new Float32Array(N * 3), pA = new Float32Array(N), pS = new Float32Array(N);
+    const pGeo = new THREE.BufferGeometry();
+    pGeo.setAttribute('position', dyn(pPos, 3));
+    pGeo.setAttribute('aColor', dyn(pCol, 3));
+    pGeo.setAttribute('aAlpha', dyn(pA, 1));
+    pGeo.setAttribute('aSize', dyn(pS, 1));
+    const pMat = new THREE.ShaderMaterial({
+      uniforms: { uScale: { value: 500 } },
+      vertexShader: [
+        'attribute vec3 aColor; attribute float aAlpha; attribute float aSize;',
+        'uniform float uScale;',
+        'varying vec3 vColor; varying float vAlpha;',
+        'void main(){',
+        '  vec4 mv=modelViewMatrix*vec4(position,1.0);',
+        '  gl_Position=projectionMatrix*mv;',
+        '  gl_PointSize=max(1.0,aSize*uScale/-mv.z);',
+        '  vColor=aColor; vAlpha=aAlpha;',
+        '}'
+      ].join('\n'),
+      fragmentShader: [
+        'varying vec3 vColor; varying float vAlpha;',
+        'void main(){',
+        '  vec2 p=gl_PointCoord*2.0-1.0;',
+        '  float r=length(p);',
+        '  if(r>1.0||vAlpha<0.004) discard;',
+        '  float core=1.0-smoothstep(0.24,0.34,r);',
+        '  float halo=(1.0-r)*(1.0-r)*0.55;',
+        '  gl_FragColor=vec4(mix(vColor,vec3(1.0),core*0.22),clamp(core+halo,0.0,1.0)*vAlpha);',
+        '}'
+      ].join('\n'),
+      transparent: true, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending
+    });
+    const points = new THREE.Points(pGeo, pMat);
+    points.frustumCulled = false; points.renderOrder = 2;
+    tree.add(points);
+
+    // edges: camera-facing ribbons, one draw call
+    const E = N - 1;
+    const eA = new Float32Array(E * 12), eB = new Float32Array(E * 12), eCol = new Float32Array(E * 12);
+    const eAl = new Float32Array(E * 4), eW = new Float32Array(E * 4), eT = new Float32Array(E * 4), eSide = new Float32Array(E * 4);
+    const idx = new Uint16Array(E * 6);
+    for (let e = 0; e < E; e++) {
+      const v = e * 4;
+      eT.set([0, 0, 1, 1], v);
+      eSide.set([-1, 1, -1, 1], v);
+      idx.set([v, v + 1, v + 2, v + 2, v + 1, v + 3], e * 6);
+    }
+    const eGeo = new THREE.BufferGeometry();
+    eGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(E * 12), 3));
+    eGeo.setAttribute('aA', dyn(eA, 3));
+    eGeo.setAttribute('aB', dyn(eB, 3));
+    eGeo.setAttribute('aT', new THREE.BufferAttribute(eT, 1));
+    eGeo.setAttribute('aSide', new THREE.BufferAttribute(eSide, 1));
+    eGeo.setAttribute('aColor', dyn(eCol, 3));
+    eGeo.setAttribute('aAlpha', dyn(eAl, 1));
+    eGeo.setAttribute('aW', dyn(eW, 1));
+    eGeo.setIndex(new THREE.BufferAttribute(idx, 1));
+    const eMat = new THREE.ShaderMaterial({
+      uniforms: { uWidth: { value: 0.028 } },
+      vertexShader: [
+        'attribute vec3 aA; attribute vec3 aB; attribute float aT; attribute float aSide;',
+        'attribute vec3 aColor; attribute float aAlpha; attribute float aW;',
+        'uniform float uWidth;',
+        'varying vec3 vColor; varying float vAlpha; varying float vSide;',
+        'void main(){',
+        '  vec4 a=modelViewMatrix*vec4(aA,1.0);',
+        '  vec4 b=modelViewMatrix*vec4(aB,1.0);',
+        '  vec4 p=mix(a,b,aT);',
+        '  vec3 d=b.xyz-a.xyz; float l=length(d);',
+        '  d = l>0.00001 ? d/l : vec3(0.0,1.0,0.0);',
+        '  vec3 s=cross(d,normalize(-p.xyz)); float sl=length(s);',
+        '  s = sl>0.00001 ? s/sl : vec3(1.0,0.0,0.0);',
+        '  p.xyz+=s*aSide*uWidth*aW;',
+        '  gl_Position=projectionMatrix*p;',
+        '  vColor=aColor; vAlpha=aAlpha; vSide=aSide;',
+        '}'
+      ].join('\n'),
+      fragmentShader: [
+        'varying vec3 vColor; varying float vAlpha; varying float vSide;',
+        'void main(){',
+        '  float d=abs(vSide);',
+        '  float a=((1.0-smoothstep(0.15,0.5,d))*0.8+(1.0-d)*0.35)*vAlpha;',
+        '  if(a<0.003) discard;',
+        '  gl_FragColor=vec4(vColor,a);',
+        '}'
+      ].join('\n'),
+      transparent: true, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide
+    });
+    const edges = new THREE.Mesh(eGeo, eMat);
+    edges.frustumCulled = false; edges.renderOrder = 1;
+    tree.add(edges);
+
+    /* --- per-frame state --- */
+    const P = new Float32Array(N * 3), GR = new Float32Array(N), EAF = new Float32Array(N), WW = new Float32Array(N);
+    const ease = x => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
+    const c01 = x => (x < 0 ? 0 : x > 1 ? 1 : x);
+    const PHASES = [['MINIMAX', 'expands every branch'], ['ALPHA-BETA', 'prunes subtrees'], ['ALPHA-BETA', 'same move, fewer nodes']];
+    let lastPhase = -1, lastMM = null, lastAB = null;
+
+    function update(t, still) {
+      const dim = still ? 1 : ease((t - DIM0) / DIM);
+      const pvK = still ? 1 : ease((t - PV0) / 0.7);
+      const fade = still ? 1 : 1 - ease((t - OUT0) / 1.0);
+      let mm = 0, ab = 0;
+      for (let i = 0; i < N; i++) {
+        const n = nodes[i];
+        const g = still ? 1 : ease((t - n.mmT) / GROW);
+        let a = still ? 1 : c01((t - n.mmT - GROW * 0.55) / 0.2);
+        if (still || t >= n.mmT + GROW * 0.55) mm++;
+        let ea = g > 0.001 ? 1 : 0;
+        let r = WHITE[0] + (GREY[0] - WHITE[0]) * dim;
+        let gg = WHITE[1] + (GREY[1] - WHITE[1]) * dim;
+        let b = WHITE[2] + (GREY[2] - WHITE[2]) * dim;
+        if (n.visited) {
+          const v = still ? 1 : ease((t - n.abT) / 0.25);
+          if (still || t >= n.abT) ab++;
+          r += (LIT[0] - r) * v; gg += (LIT[1] - gg) * v; b += (LIT[2] - b) * v;
+        }
+        let s = SIZE[n.depth], w = 1;
+        if (n.pv) {
+          r += (BRIGHT[0] - r) * pvK; gg += (BRIGHT[1] - gg) * pvK; b += (BRIGHT[2] - b) * pvK;
+          s *= 1 + 0.28 * pvK; w = 1 + 0.8 * pvK; ea *= 1 + 0.8 * pvK;
+        }
+        if (!still && n.cutT < 1e8) {            // cut node pulses as it absorbs a pruned subtree
+          const k = (t - n.cutT) / 0.55;
+          if (k > 0 && k < 1) s *= 1 + 0.55 * Math.sin(Math.PI * k);
+        }
+        let x = n.x, y = n.y, z = n.z;
+        if (n.cut >= 0) {
+          if (still) { a *= 0.3; ea *= 0.3; }
+          else {
+            const f = ease((t - n.pruneT) / PRUNE);
+            if (f > 0) {
+              const c = nodes[n.cut];
+              x += (c.x - x) * f; y += (c.y - y) * f; z += (c.z - z) * f;
+              a *= 1 - f; ea *= 1 - f; s *= 1 - 0.5 * f;
+            }
+          }
+        }
+        a *= fade; ea *= fade;
+        const i3 = i * 3;
+        P[i3] = x; P[i3 + 1] = y; P[i3 + 2] = z;
+        GR[i] = g; EAF[i] = ea; WW[i] = w;
+        pPos[i3] = x; pPos[i3 + 1] = y; pPos[i3 + 2] = z;
+        pCol[i3] = r; pCol[i3 + 1] = gg; pCol[i3 + 2] = b;
+        pA[i] = a; pS[i] = s;
+      }
+      for (let e = 0; e < E; e++) {
+        const c = e + 1, p = nodes[c].parent, c3 = c * 3, p3 = p * 3;
+        const sx = P[p3], sy = P[p3 + 1], sz = P[p3 + 2], g = GR[c];
+        const ex = sx + (P[c3] - sx) * g, ey = sy + (P[c3 + 1] - sy) * g, ez = sz + (P[c3 + 2] - sz) * g;
+        const al = EAF[c] * 0.5, w = WW[c];
+        for (let k = 0; k < 4; k++) {
+          const v = e * 4 + k, v3 = v * 3;
+          eA[v3] = sx; eA[v3 + 1] = sy; eA[v3 + 2] = sz;
+          eB[v3] = ex; eB[v3 + 1] = ey; eB[v3 + 2] = ez;
+          eCol[v3] = pCol[c3]; eCol[v3 + 1] = pCol[c3 + 1]; eCol[v3 + 2] = pCol[c3 + 2];
+          eAl[v] = al; eW[v] = w;
+        }
+      }
+      ['position', 'aColor', 'aAlpha', 'aSize'].forEach(k => { pGeo.attributes[k].needsUpdate = true; });
+      ['aA', 'aB', 'aColor', 'aAlpha', 'aW'].forEach(k => { eGeo.attributes[k].needsUpdate = true; });
+
+      const ph = still ? 2 : t < DIM0 ? 0 : t < PV0 ? 1 : 2;
+      if (ph !== lastPhase) { lastPhase = ph; hud.phase.textContent = PHASES[ph][0]; hud.sub.textContent = PHASES[ph][1]; }
+      if (mm !== lastMM) { lastMM = mm; hud.mm.textContent = mm; }
+      const abText = still || t >= AB0 ? String(ab) : '—';
+      if (abText !== lastAB) { lastAB = abText; hud.ab.textContent = abText; }
+    }
+
+    /* --- sizing: fit the whole cone at any aspect ratio --- */
+    const FOV_T = Math.tan((camera.fov * Math.PI / 180) / 2);
+    const buf = new THREE.Vector2();
+    function resize() {
+      const w = stage.clientWidth, h = stage.clientHeight;
+      if (!w || !h) return;
+      renderer.setSize(w, h, false);
+      camera.aspect = w / h;
+      const dist = Math.max(6.0 / (2 * FOV_T), 5.6 / (2 * FOV_T * camera.aspect));
+      camera.position.set(0, dist * 0.3, dist);
+      camera.lookAt(0, -0.3, 0);
+      camera.updateProjectionMatrix();
+      renderer.getDrawingBufferSize(buf);
+      bgMat.uniforms.uRes.value.copy(buf);
+      pMat.uniforms.uScale.value = buf.y / (2 * FOV_T);
+      kick();
+    }
+
+    /* --- loop: pauses when hidden or off-screen; static under reduced motion --- */
+    let rotY = 0.6, vel = 0, dragging = false, pid = null, lastX = 0;
+    let clock = 0, raf = 0, running = false, inView = true, last = 0;
+    const AUTO = 0.13;
+    function frame(now) {
+      raf = 0;
+      const dt = last ? Math.min(0.05, (now - last) / 1000) : 0;
+      last = now;
+      if (!reduce) {
+        clock = (clock + dt) % LOOP;
+        if (!dragging) { rotY += AUTO * dt + vel; vel *= 0.92; if (Math.abs(vel) < 0.00002) vel = 0; }
+      }
+      tree.rotation.y = rotY;
+      update(clock, reduce);
+      renderer.render(scene, camera);
+      if (running) raf = requestAnimationFrame(frame);
+    }
+    function kick() { if (!raf && !dead) raf = requestAnimationFrame(frame); }
+    function play() {
+      if (running || reduce || dead || !inView || document.hidden) return;
+      running = true; last = 0; kick();
+    }
+    function pause() { running = false; if (raf) { cancelAnimationFrame(raf); raf = 0; } }
+
+    document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); else play(); });
+    if ('IntersectionObserver' in window) {
+      new IntersectionObserver(es => { inView = es[es.length - 1].isIntersecting; if (inView) play(); else pause(); }).observe(stage);
+    }
+    if ('ResizeObserver' in window) new ResizeObserver(resize).observe(stage);
+    else window.addEventListener('resize', resize);
+    canvas.addEventListener('webglcontextlost', e => { e.preventDefault(); pause(); fallback(); });
+
+    // horizontal drag rotates; vertical swipes scroll the page (touch-action: pan-y)
+    let hinted = false;
+    canvas.addEventListener('pointerdown', e => {
+      dragging = true; pid = e.pointerId; lastX = e.clientX; vel = 0;
+      try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+      if (!hinted) { hinted = true; hud.hint.style.opacity = '0'; }
+    });
+    canvas.addEventListener('pointermove', e => {
+      if (!dragging || e.pointerId !== pid) return;
+      const d = (e.clientX - lastX) * 0.0085;
+      lastX = e.clientX; rotY += d; vel = reduce ? 0 : d * 0.85;
+      kick();
+    });
+    const release = e => { if (e.pointerId === pid) { dragging = false; pid = null; } };
+    canvas.addEventListener('pointerup', release);
+    canvas.addEventListener('pointercancel', release);
+
+    resize();
+    if (reduce) kick(); else play();
+  }
+})();
+</script>
+</body>
+</html>
