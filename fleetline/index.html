@@ -1,0 +1,820 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#080B10">
+<meta name="description" content="FleetLine: a real-time console for supervising a robot fleet, with a natural-language command line that treats the LLM as untrusted input. A project by Ahmed Sohail Butt.">
+<title>FleetLine</title>
+<style>
+[hidden]{display:none!important}
+:root{
+  color-scheme: dark;
+  --bg:#080B10; --bg-1:#0C1118; --bg-2:#111822; --scene:#090D13;
+  --line:#1A2330; --line-2:#263243;
+  --text:#E8ECF1; --text-2:#A4AFBD; --text-3:#6E7A8A;
+  --accent:#38BDF8; --accent-ink:#03131C; --accent-soft:rgba(56,189,248,.12); --accent-line:rgba(56,189,248,.45);
+  --stop:#EF4444; --stop-btn:#DC2626; --stop-ink:#FFF4F4; --stop-soft:rgba(239,68,68,.14); --stop-text:#FCA5A5;
+  --sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Roboto Mono", "Liberation Mono", monospace;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{background:var(--bg);-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.55 var(--sans);-webkit-font-smoothing:antialiased}
+a{color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button{font:inherit;color:inherit;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.page{max-width:780px;margin:0 auto;padding-inline:18px;padding-block:26px 36px;overflow-x:clip}
+
+/* Hero */
+.eyebrow{margin:0;font:500 12px/1.4 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--text-3)}
+h1{margin:10px 0 12px;font-size:clamp(50px,14vw,88px);line-height:.92;font-weight:700;letter-spacing:-.05em}
+.caret{display:inline-block;width:.34em;height:.72em;margin-left:.07em;background:var(--accent);vertical-align:-.02em;animation:blink 1.06s steps(1,end) infinite}
+@keyframes blink{50%{opacity:0}}
+.lead{margin:0;max-width:36ch;font-size:clamp(17px,4.7vw,21px);line-height:1.45;color:var(--text-2);text-wrap:pretty}
+.lead em{font-style:normal;color:var(--text)}
+.chips{list-style:none;margin:18px 0 0;padding:0;display:flex;flex-wrap:wrap;gap:6px}
+.chips li{font:12.5px/1 var(--mono);color:var(--text-2);padding:7px 9px;border:1px solid var(--line-2);border-radius:6px}
+
+/* Demo console */
+.console{margin-top:22px;background:var(--bg-1);border:1px solid var(--line-2);border-radius:16px;overflow:hidden}
+.stage{position:relative;height:clamp(310px,88vw,480px);overflow:hidden;
+  background:radial-gradient(80% 65% at 50% 100%,rgba(56,189,248,.20),rgba(56,189,248,0) 70%),linear-gradient(180deg,var(--scene),#0B121B);
+  -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+.stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:pan-y;cursor:grab}
+.stage canvas:active{cursor:grabbing}
+.stage-ui,.labels{position:absolute;inset:0;pointer-events:none}
+.lbl{position:absolute;left:0;top:0;font:600 10.5px/1 var(--mono);letter-spacing:.04em;color:var(--text);white-space:nowrap;padding:3px 4px;border-radius:3px;will-change:transform;transform:translate3d(-200px,-200px,0);text-shadow:0 1px 2px rgba(0,0,0,.6)}
+.lbl.is-stopped{color:var(--stop-text)}
+.lbl.is-cmd{color:var(--accent-ink);background:var(--accent);text-shadow:none}
+.lbl.zone{font-weight:500;font-size:9.5px;letter-spacing:.1em;color:var(--text-3);padding:0}
+.sim-tag,.fleet{position:absolute;top:10px;font:600 10.5px/1 var(--mono);text-transform:uppercase;background:rgba(8,11,16,.8);border:1px solid var(--line-2);border-radius:5px;padding:6px 8px}
+.sim-tag{left:10px;letter-spacing:.12em;color:var(--text)}
+.fleet{right:10px;display:flex;align-items:center;gap:7px;letter-spacing:.08em;color:var(--text-2)}
+.fleet i{width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent)}
+.fleet.is-alert{color:var(--stop-text);border-color:rgba(239,68,68,.5)}
+.fleet.is-alert i{background:var(--stop);box-shadow:0 0 8px var(--stop)}
+.hint{position:absolute;left:10px;right:10px;bottom:9px;margin:0;font:11px/1.3 var(--mono);color:var(--text-3);transition:color .2s}
+.hint.is-hot{color:var(--text)}
+.fallback-msg{position:absolute;left:50%;top:54%;transform:translate(-50%,-50%);width:min(280px,82%);margin:0;text-align:center;font-size:14px;color:var(--text-2)}
+.stage.is-fallback canvas,.stage.is-fallback .labels{display:none}
+
+.controls{display:flex;gap:10px;padding:12px;border-top:1px solid var(--line)}
+.estop{flex:1;min-height:56px;border:0;border-radius:11px;background:var(--stop-btn);color:var(--stop-ink);font:700 15px/1 var(--mono);letter-spacing:.14em;box-shadow:inset 0 -3px 0 rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.18)}
+.estop:active{transform:translateY(1px)}
+.estop[aria-pressed="true"]{background:#3A0D0F;color:var(--stop-text);box-shadow:inset 0 0 0 1px var(--stop)}
+.resume{min-width:112px;min-height:56px;border-radius:11px;border:1px solid var(--line-2);background:transparent;color:var(--text);font:600 14px/1 var(--mono);letter-spacing:.06em}
+.resume:disabled{color:var(--text-3);cursor:default}
+.resume.is-ready{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+
+.cmd{padding:14px 12px;border-top:1px solid var(--line)}
+.cmd-label{display:block;margin:0 0 8px;font:600 11px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--text-3)}
+.cmd-row{display:flex;align-items:center;gap:8px;padding:4px 4px 4px 12px;background:var(--bg);border:1px solid var(--line-2);border-radius:10px}
+.cmd-row:focus-within{border-color:var(--accent-line)}
+.prompt{font:600 16px/1 var(--mono);color:var(--accent)}
+.cmd-row input{flex:1;min-width:0;padding:11px 0;border:0;outline:0;background:transparent;color:var(--text);font:16px/1.2 var(--mono)}
+.cmd-row input::placeholder{color:var(--text-3)}
+.run{height:40px;padding:0 16px;border:0;border-radius:7px;background:var(--accent);color:var(--accent-ink);font:700 13px/1 var(--mono);letter-spacing:.06em}
+.presets{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.preset{padding:9px 11px;border:1px solid var(--line-2);border-radius:8px;background:var(--bg-2);color:var(--text);font:13px/1 var(--mono)}
+.preset:hover{border-color:var(--accent-line)}
+.out{margin-top:12px;padding:12px;min-height:92px;background:var(--bg);border:1px solid var(--line);border-radius:10px;font:13px/1.5 var(--mono)}
+.out-empty{margin:0;font:14px/1.5 var(--sans);color:var(--text-3)}
+.out-head{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.out-state{margin-left:auto;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-3)}
+.badge{display:inline-block;padding:4px 7px;border:1px solid;border-radius:4px;font:700 11px/1 var(--mono);letter-spacing:.1em}
+.badge.llm{color:var(--accent);border-color:var(--accent-line);background:var(--accent-soft)}
+.badge.gram{color:var(--text);border-color:#5A6676;background:rgba(232,236,241,.06)}
+.badge.rej{color:var(--stop-text);border-color:rgba(239,68,68,.5);background:var(--stop-soft)}
+.badge.wait{color:var(--text-3);border-color:var(--line-2)}
+.trace{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:5px}
+.trace li{display:grid;grid-template-columns:84px 1fr;gap:8px;font-size:12.5px;animation:rise .22s ease both}
+.trace .tk{color:var(--text-3);font-size:11px;letter-spacing:.06em;text-transform:uppercase;padding-top:2px}
+.trace .tv{color:var(--text-2);overflow-wrap:anywhere}
+.trace .ok{color:var(--accent)} .trace .bad{color:var(--stop-text)}
+.json{margin:10px 0 0;padding:10px 12px;background:var(--bg-1);border:1px solid var(--line);border-radius:8px;overflow-x:auto;font:12.5px/1.5 var(--mono);color:var(--text)}
+.jk{color:var(--text-2)} .js{color:var(--text)} .jn{color:var(--accent)} .jp{color:var(--text-3)}
+.out-note{margin:10px 0 0;font:14px/1.45 var(--sans);color:var(--text-2)}
+.demo-note{margin:10px 2px 0;font:11px/1.4 var(--mono);letter-spacing:.04em;color:var(--text-3)}
+@keyframes rise{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+
+/* Sections */
+main section{margin-top:64px}
+.sec-h{display:flex;align-items:center;gap:12px;margin:0 0 18px;font:600 12px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--text-3)}
+.sec-h::after{content:"";flex:1;height:1px;background:var(--line)}
+.problem p{margin:0;max-width:34ch;font-size:clamp(21px,5.6vw,28px);line-height:1.35;letter-spacing:-.015em;text-wrap:pretty}
+.problem p:first-of-type{color:var(--text-2)}
+.problem p+p{margin-top:14px}
+
+.cards{display:grid;gap:10px}
+.card{padding:18px 16px;background:var(--bg-1);border:1px solid var(--line);border-radius:12px}
+.card-wide{border-color:rgba(56,189,248,.35);background:linear-gradient(180deg,rgba(56,189,248,.07),rgba(56,189,248,0) 70%),var(--bg-1)}
+.tag{margin:0;font:600 11px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+.card h3{margin:10px 0 6px;font-size:18px;line-height:1.25;letter-spacing:-.01em;font-weight:650}
+.card-wide h3{font-size:21px}
+.card p:not(.tag){margin:0;font-size:15px;line-height:1.55;color:var(--text-2)}
+@media (min-width:680px){.cards{grid-template-columns:repeat(3,1fr)}.card-wide{grid-column:1/-1}}
+
+.sec-lede{margin:-4px 0 22px;max-width:52ch;color:var(--text-2)}
+.arch{display:grid;gap:30px}
+@media (min-width:700px){.arch{grid-template-columns:5fr 7fr;gap:22px;align-items:start}}
+.lane{display:flex;flex-direction:column}
+.lane-h{margin:0 0 10px;font:600 11px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--text-3);text-align:center}
+.node{padding:10px 12px;text-align:center;background:var(--bg-1);border:1px solid var(--line-2);border-radius:9px}
+.node b{display:block;font-size:14.5px;font-weight:600;line-height:1.3}
+.node small{display:block;margin-top:3px;font-size:13px;line-height:1.4;color:var(--text-2)}
+.node .m{display:block;margin-top:4px;font:12.5px/1.3 var(--mono);color:var(--accent)}
+.node small .m{display:inline;margin:0;font-size:12px}
+.node-llm{border-color:var(--accent-line)}
+.node-out{display:flex;flex-direction:column;align-items:center;gap:6px;background:var(--bg);border-style:dashed}
+.node-out small{margin:0}
+.edge{position:relative;height:30px;flex:none}
+.edge::before{content:"";position:absolute;left:50%;top:0;bottom:6px;width:1px;margin-left:-.5px;background:var(--line-2)}
+.edge::after{content:"";position:absolute;left:50%;bottom:1px;margin-left:-4px;border-style:solid;border-width:5px 4px 0;border-color:var(--text-3) transparent transparent}
+.edge span{position:absolute;top:50%;left:calc(50% + 9px);transform:translateY(-50%);font:11px/1 var(--mono);color:var(--text-3);white-space:nowrap}
+.fork{position:relative;display:grid;grid-template-columns:1fr 1fr;gap:10px;padding-top:14px;align-items:start}
+.fork::before{content:"";position:absolute;top:0;left:50%;height:14px;width:1px;margin-left:-.5px;background:var(--line-2)}
+.fork::after{content:"";position:absolute;top:14px;left:calc(25% - 2.5px);right:calc(25% - 2.5px);height:1px;background:var(--line-2)}
+.branch{display:flex;flex-direction:column}
+.nw{white-space:nowrap}
+
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media (min-width:680px){.stats{grid-template-columns:repeat(4,1fr)}}
+.stat{padding:16px 14px 15px;background:var(--bg-1);border:1px solid var(--line);border-radius:12px}
+.num{margin:0;font:600 clamp(40px,12vw,50px)/1 var(--mono);letter-spacing:-.05em;font-variant-numeric:tabular-nums;white-space:nowrap}
+.unit{margin-left:6px;font-size:14px;letter-spacing:0;color:var(--accent)}
+.lab{margin:12px 0 0;font-size:13px;line-height:1.4;color:var(--text-2)}
+.testnote{margin-top:10px;padding:14px 16px;border:1px solid var(--line);border-radius:12px;display:grid;gap:6px}
+.testnote p{margin:0}
+.testnote p:last-child{color:var(--text-2);font-size:15px}
+
+.foot{margin-top:72px;padding-top:22px;border-top:1px solid var(--line)}
+.foot-name{margin:0;font-size:clamp(20px,5.4vw,26px);font-weight:650;letter-spacing:-.015em;line-height:1.25}
+.foot-name span{color:var(--text-2);font-weight:500}
+.foot-sub{margin:6px 0 0;color:var(--text-2);font-size:15px}
+.contact{margin:20px 0 0;display:grid;gap:14px}
+.contact div{display:grid;gap:3px}
+.contact dt{font:600 11px/1.3 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--text-3)}
+.contact dd{margin:0;display:flex;align-items:center;flex-wrap:wrap;gap:10px;font:15px/1.4 var(--mono)}
+.contact a{color:var(--text);text-decoration:underline;text-decoration-color:var(--accent-line);text-underline-offset:3px;overflow-wrap:anywhere}
+.copy{padding:6px 10px;border:1px solid var(--line-2);border-radius:6px;background:transparent;color:var(--text-2);font:600 12px/1 var(--mono)}
+.foot-fine{margin:26px 0 0;font-size:12.5px;color:var(--text-3)}
+
+@media (prefers-reduced-motion:reduce){.caret,.trace li{animation:none}.hint{transition:none}}
+</style>
+</head>
+<body>
+<div class="page">
+  <section class="hero" aria-labelledby="title">
+    <p class="eyebrow">Project · Ahmed Sohail Butt</p>
+    <h1 id="title">FleetLine<span class="caret" aria-hidden="true"></span></h1>
+    <p class="lead">A real-time console for supervising a robot fleet, with a natural-language command line that <em>treats the LLM as untrusted input.</em></p>
+    <ul class="chips" aria-label="Tech stack">
+      <li>React 19</li><li>TypeScript</li><li>WebSockets</li><li>Canvas</li><li>Gemini API</li><li>Vitest</li><li>Vite</li>
+    </ul>
+
+    <div class="console" id="demo">
+      <div class="stage" id="stage">
+        <canvas id="scene" role="img" aria-label="Simulated warehouse floor with eight robots moving between aisles and loading docks"></canvas>
+        <div class="stage-ui">
+          <div class="labels" id="labels" aria-hidden="true"></div>
+          <span class="sim-tag">Simulated demo</span>
+          <span class="fleet" id="fleet" role="status"><i></i><span id="fleet-text">8 active</span></span>
+          <p class="hint" id="hint" aria-live="polite">Drag sideways to rotate · Tap a robot to stop it</p>
+          <p class="fallback-msg" id="fallback-msg" hidden>3D view unavailable on this device. The command demo below still runs.</p>
+        </div>
+      </div>
+      <div class="controls">
+        <button id="estop" class="estop" type="button" aria-pressed="false">E-STOP ALL</button>
+        <button id="resume" class="resume" type="button" disabled>Resume</button>
+      </div>
+      <form class="cmd" id="cmd-form" autocomplete="off">
+        <label class="cmd-label" for="cmd-input">Command line</label>
+        <div class="cmd-row">
+          <span class="prompt" aria-hidden="true">&gt;</span>
+          <input id="cmd-input" name="cmd" type="text" placeholder="send R3 to dock B" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="go">
+          <button class="run" id="cmd-run" type="submit">Run</button>
+        </div>
+        <div class="presets" role="group" aria-label="Preset commands">
+          <button type="button" class="preset" data-cmd="send R3 to dock B">send R3 to dock B</button>
+          <button type="button" class="preset" data-cmd="stop R1">stop R1</button>
+          <button type="button" class="preset" data-cmd="move R5 to aisle 4">move R5 to aisle 4</button>
+        </div>
+        <div class="out" id="out" aria-live="polite">
+          <p class="out-empty">Tap a preset. The model's proposal is validated before any robot moves.</p>
+        </div>
+        <p class="demo-note">Simulated demo · scripted model responses · no API calls</p>
+      </form>
+    </div>
+  </section>
+
+  <main>
+    <section class="problem" aria-labelledby="problem-h">
+      <h2 class="sec-h" id="problem-h">The problem</h2>
+      <p>Supervising a robot fleet means watching every robot live and being able to stop any of them instantly, even as the connection drops and recovers.</p>
+      <p>Natural-language commands make that faster, but a language model can return malformed or invented output, so nothing it says should reach a robot unchecked.</p>
+    </section>
+
+    <section aria-labelledby="built-h">
+      <h2 class="sec-h" id="built-h">What I built</h2>
+      <div class="cards">
+        <article class="card card-wide">
+          <p class="tag">Gemini API</p>
+          <h3>Natural-language commands, validated</h3>
+          <p>Gemini may only propose JSON against a schema. A hand-rolled validator checks every field against the live command vocabulary. Exactly one corrective re-prompt quotes the precise error back to the model; a second failure falls through to a deterministic grammar parser. Every command shows GRAMMAR or LLM provenance in the UI.</p>
+        </article>
+        <article class="card">
+          <p class="tag">WebSockets</p>
+          <h3>Live fleet stream</h3>
+          <p>Real-time event streaming with exponential-backoff reconnect and subscription replay.</p>
+        </article>
+        <article class="card">
+          <p class="tag">Canvas</p>
+          <h3>60 fps map, 10 Hz sim</h3>
+          <p>The map interpolates robot positions between 10 Hz simulation updates to render at 60 fps.</p>
+        </article>
+        <article class="card">
+          <p class="tag">Safety</p>
+          <h3>Emergency stops</h3>
+          <p>Stop a single robot or the whole fleet, with per-robot and fleet-wide E-stop controls.</p>
+        </article>
+      </div>
+    </section>
+
+    <section aria-labelledby="how-h">
+      <h2 class="sec-h" id="how-h">How it works</h2>
+      <p class="sec-lede">Telemetry streams up from the simulation. Model output never runs until the validator accepts it.</p>
+      <div class="arch">
+        <div class="lane" role="group" aria-label="Telemetry path">
+          <p class="lane-h">Telemetry</p>
+          <div class="node"><b>Simulation backend</b><span class="m">10 Hz</span></div>
+          <div class="edge"><span>WebSocket events</span></div>
+          <div class="node"><b>Connection layer</b><small>Exponential-backoff reconnect, subscription replay</small></div>
+          <div class="edge"></div>
+          <div class="node"><b>Console</b><small>Canvas map interpolated to <span class="m">60 fps</span>; per-robot and fleet E-stop</small></div>
+        </div>
+        <div class="lane" role="group" aria-label="Command path">
+          <p class="lane-h">Natural-language command</p>
+          <div class="node"><b>Operator text</b><span class="m">"send R3 to dock B"</span></div>
+          <div class="edge"></div>
+          <div class="node node-llm"><b>Gemini</b><small>May only propose JSON against a schema</small></div>
+          <div class="edge"></div>
+          <div class="node"><b>Validator</b><small>Hand-rolled; checks every field against the live command vocabulary</small></div>
+          <div class="fork">
+            <div class="branch">
+              <div class="edge"><span>valid</span></div>
+              <div class="node node-out"><span class="badge llm">LLM</span><small>Runs, on the first try or after the re-prompt</small></div>
+            </div>
+            <div class="branch">
+              <div class="edge"><span>invalid</span></div>
+              <div class="node"><b>1 corrective <span class="nw">re-prompt</span></b><small>Quotes the exact error back</small></div>
+              <div class="edge"><span>fails again</span></div>
+              <div class="node"><b>Grammar parser</b><small>Deterministic fallback</small></div>
+              <div class="edge"></div>
+              <div class="node node-out"><span class="badge gram">GRAMMAR</span><small>Runs</small></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section aria-labelledby="proof-h">
+      <h2 class="sec-h" id="proof-h">Proof</h2>
+      <div class="stats">
+        <div class="stat"><p class="num">60<span class="unit">fps</span></p><p class="lab">Canvas map render rate</p></div>
+        <div class="stat"><p class="num">10<span class="unit">Hz</span></p><p class="lab">Simulation backend update rate</p></div>
+        <div class="stat"><p class="num">189<span class="unit">tests</span></p><p class="lab">Vitest, across simulation, command pipeline and connection layer</p></div>
+        <div class="stat"><p class="num">1<span class="unit">re-prompt</span></p><p class="lab">Maximum corrective re-prompts before the grammar fallback</p></div>
+      </div>
+      <div class="testnote">
+        <p class="tag">Integration tests</p>
+        <p>Kill and restart the mock WebSocket server mid-stream to prove reconnect-and-replay correctness.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <p class="foot-name">Ahmed Sohail Butt <span>· open to winter 2027 co-op</span></p>
+    <p class="foot-sub">Computer Science, Wilfrid Laurier University · graduating Dec 2027</p>
+    <dl class="contact">
+      <div><dt>Project</dt><dd><a href="https://github.com/ahmedsohail2003/fleetline" target="_blank" rel="noopener">github.com/ahmedsohail2003/fleetline</a></dd></div>
+      <div><dt>GitHub</dt><dd><a href="https://github.com/ahmedsohail2003" target="_blank" rel="noopener">github.com/ahmedsohail2003</a></dd></div>
+      <div><dt>Email</dt><dd><a id="email" href="mailto:ahmedsohaill2003@gmail.com">ahmedsohaill2003@gmail.com</a><button class="copy" id="copy-email" type="button">Copy</button></dd></div>
+    </dl>
+    <p class="foot-fine">The 3D scene and command demo on this page are simulated illustrations, not live data.</p>
+  </footer>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.min.js"></script>
+<script>
+(() => {
+  'use strict';
+  const $ = s => document.querySelector(s);
+  const reduceMotion = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+
+  /* ---------- Warehouse layout (world units; docks face the camera) ---------- */
+  const IDS = ['R1','R2','R3','R4','R5','R6','R7','R8'];
+  const RACK_X = [-6, -3, 0, 3, 6], RACK_Z0 = -4.4, RACK_Z1 = 1.0, RACK_W = 0.8, RACK_H = 0.75;
+  const AISLE_X = [-4.5, -1.5, 1.5, 4.5], AISLE_MID = -1.7;
+  const FRONT_Z = 2.6, BACK_Z = -5.5;
+  const DOCKS = { A: -4, B: 0, C: 4 }, DOCK_Z = 4.8;
+  const SIM_DT = 0.1, MAX_V = 1.7, ACCEL = 2.2;
+  const START = [[-4.5,-0.6],[-5.3,2.9],[1.5,-2.8],[-2.2,-5.5],[5.6,2.3],[-1.5,0.3],[4,4.8],[4.4,-5.5]];
+
+  const PATROL = [];
+  AISLE_X.forEach(x => [-3.6, -1.7, 0.2].forEach(z => PATROL.push({ x, z })));
+  Object.values(DOCKS).forEach(x => PATROL.push({ x, z: DOCK_Z }));
+  [-6, -3, 0, 3, 6].forEach(x => PATROL.push({ x, z: BACK_Z }));
+  [-6.2, -2.2, 2.2, 6.2].forEach(x => PATROL.push({ x, z: FRONT_Z + 0.5 }));
+
+  const robots = IDS.map((id, i) => {
+    const [x, z] = START[i], h = i % 2 ? Math.PI : 0;
+    return { id, i, x, z, h, px: x, pz: z, ph: h, rx: x, rz: z, rh: h, v: 0, path: [], dest: null,
+             wait: 0.3 + i * 0.3, hold: 0, stopped: false, cmd: null, where: '', noteEl: null };
+  });
+  let fleetStop = false, alpha = 0, activeBot = null;
+
+  const zoneOf = z => (z > RACK_Z1 + 0.2 ? 'front' : z < RACK_Z0 - 0.2 ? 'back' : 'aisle');
+  const aisleOf = x => { let k = 0, d = 1e9; AISLE_X.forEach((a, i) => { const e = Math.abs(x - a); if (e < d) { d = e; k = i; } }); return k; };
+  const lerpAngle = (a, b, t) => { let d = (b - a) % (Math.PI * 2); if (d > Math.PI) d -= Math.PI * 2; else if (d < -Math.PI) d += Math.PI * 2; return a + d * t; };
+
+  // Manhattan routing through the corridors, so robots never cut through racks.
+  function route(r, tx, tz) {
+    const lane = [-0.45, 0, 0.45][r.i % 3];
+    const fz = FRONT_Z + lane, bz = BACK_Z + lane * 0.6;
+    const ax = k => AISLE_X[k] + (r.i % 2 ? 0.25 : -0.25);
+    const from = zoneOf(r.z), to = zoneOf(tz), end = { x: tx, z: tz };
+    if (from === to && from !== 'aisle') return [end];
+    if (from === 'aisle' && to === 'aisle' && aisleOf(r.x) === aisleOf(tx)) return [end];
+    if (from === 'aisle') {
+      const a = aisleOf(r.x);
+      if (to === 'aisle') {
+        const b = aisleOf(tx);
+        const cz = (fz - r.z) + (fz - tz) <= (r.z - bz) + (tz - bz) ? fz : bz;
+        return [{ x: ax(a), z: cz }, { x: ax(b), z: cz }, end];
+      }
+      return [{ x: ax(a), z: to === 'front' ? fz : bz }, end];
+    }
+    const cz0 = from === 'front' ? fz : bz;
+    if (to === 'aisle') return [{ x: ax(aisleOf(tx)), z: cz0 }, end];
+    let k = 0, best = 1e9;
+    AISLE_X.forEach((a, i) => { const c = Math.abs(r.x - a) + Math.abs(tx - a); if (c < best) { best = c; k = i; } });
+    return [{ x: ax(k), z: cz0 }, { x: ax(k), z: to === 'front' ? fz : bz }, end];
+  }
+
+  function pickPatrol(r) {
+    const free = PATROL.filter(p => Math.hypot(p.x - r.x, p.z - r.z) > 2.5 && robots.every(o => o === r ||
+      (Math.hypot(p.x - o.x, p.z - o.z) > 1.4 && !(o.dest && Math.hypot(p.x - o.dest.x, p.z - o.dest.z) < 1.4))));
+    const list = free.length ? free : PATROL;
+    return list[(Math.random() * list.length) | 0];
+  }
+  const pathLen = r => { let L = 0, x = r.x, z = r.z; for (const p of r.path) { L += Math.hypot(p.x - x, p.z - z); x = p.x; z = p.z; } return L; };
+
+  // Fixed 10 Hz simulation step; rendering interpolates between steps.
+  function simStep() {
+    for (const r of robots) {
+      r.px = r.x; r.pz = r.z; r.ph = r.h;
+      if (fleetStop || r.stopped) { r.v = 0; continue; }
+      if (!r.path.length) {
+        r.v = 0;
+        if (r.hold > 0) { r.hold -= SIM_DT; if (r.hold <= 0) r.cmd = null; continue; }
+        if (reduceMotion) continue;
+        if (r.wait > 0) { r.wait -= SIM_DT; continue; }
+        const d = pickPatrol(r); r.dest = d; r.path = route(r, d.x, d.z); r.wait = 0.5 + Math.random() * 1.6;
+        continue;
+      }
+      r.v = Math.min(MAX_V, r.v + ACCEL * SIM_DT, Math.max(0.25, Math.sqrt(2 * ACCEL * pathLen(r))));
+      let step = r.v * SIM_DT, mx = 0, mz = 0;
+      while (step > 1e-6 && r.path.length) {
+        const p = r.path[0], dx = p.x - r.x, dz = p.z - r.z, d = Math.hypot(dx, dz);
+        if (d <= step) { r.x = p.x; r.z = p.z; step -= d; mx += dx; mz += dz; r.path.shift(); }
+        else { const k = step / d; r.x += dx * k; r.z += dz * k; mx += dx * k; mz += dz * k; step = 0; }
+      }
+      if (mx * mx + mz * mz > 1e-8) r.h = lerpAngle(r.h, Math.atan2(mx, mz), 0.55);
+      if (!r.path.length) { r.v = 0; r.dest = null; if (r.cmd) { r.hold = 6; arrived(r); } }
+    }
+  }
+  function freeze(r) { r.x = r.px = r.rx; r.z = r.pz = r.rz; r.h = r.ph = r.rh; r.v = 0; }
+  function arrived(r) {
+    if (r.noteEl && r.noteEl.isConnected) r.noteEl.textContent = `${r.id} arrived at ${r.where}. It holds briefly, then returns to patrol.`;
+    flash(`${r.id} arrived at ${r.where}`);
+  }
+
+  /* ---------- Status, E-stop, taps ---------- */
+  const estopBtn = $('#estop'), resumeBtn = $('#resume'), fleetEl = $('#fleet'), fleetText = $('#fleet-text'), hint = $('#hint');
+  const HINT = hint.textContent; let hintTimer = 0;
+  function flash(msg) {
+    hint.textContent = msg; hint.classList.add('is-hot'); clearTimeout(hintTimer);
+    hintTimer = setTimeout(() => { hint.textContent = HINT; hint.classList.remove('is-hot'); }, 2600);
+  }
+  function updateStatus() {
+    const n = robots.filter(r => fleetStop || r.stopped).length;
+    fleetEl.classList.toggle('is-alert', n > 0);
+    fleetText.textContent = fleetStop ? 'E-stop · 8 stopped' : n ? `${8 - n} active · ${n} stopped` : '8 active';
+    estopBtn.setAttribute('aria-pressed', String(fleetStop));
+    estopBtn.textContent = fleetStop ? 'E-STOP ENGAGED' : 'E-STOP ALL';
+    resumeBtn.disabled = n === 0;
+    resumeBtn.classList.toggle('is-ready', n > 0);
+  }
+  estopBtn.addEventListener('click', () => {
+    if (fleetStop) { flash('Fleet E-stop is engaged. Press Resume to release.'); return; }
+    fleetStop = true; robots.forEach(freeze); updateStatus(); flash('E-stop: all 8 robots stopped');
+  });
+  resumeBtn.addEventListener('click', () => {
+    fleetStop = false; robots.forEach(r => { r.stopped = false; }); updateStatus(); flash('Fleet resumed');
+  });
+  function toggleRobot(r) {
+    if (fleetStop) { flash('Fleet E-stop is engaged. Press Resume to release.'); return; }
+    if (r.stopped) { r.stopped = false; flash(`${r.id} released`); }
+    else { r.stopped = true; freeze(r); flash(`${r.id} stopped. Tap it again to release.`); }
+    updateStatus();
+  }
+
+  /* ---------- Command pipeline (simulated: scripted model output, real validator) ---------- */
+  const VOCAB = { action: ['move', 'stop', 'resume'], robot: IDS, dock: ['A', 'B', 'C'], aisle: [1, 2, 3, 4] };
+  const SCRIPTS = {
+    'send r3 to dock b': [{ action: 'move', robot: 'R3', target: { type: 'dock', id: 'B' } }],
+    'stop r1': [{ action: 'halt', robot: 'R1' }, { action: 'stop', robot: 'R1' }],
+    'move r5 to aisle 4': [
+      { action: 'move', robot: 'R5', target: { type: 'aisle', id: 'four' } },
+      { action: 'move', robot: 'R5', target: { type: 'aisle', id: 4 }, speed: 'fast' }
+    ]
+  };
+  function validate(c) {
+    if (!c || typeof c !== 'object') return 'proposal is not a JSON object';
+    const allowed = c.action === 'move' ? ['action', 'robot', 'target'] : ['action', 'robot'];
+    for (const k of Object.keys(c)) if (!allowed.includes(k)) return `${k}: unknown field`;
+    if (!VOCAB.action.includes(c.action)) return `action: "${c.action}" is not one of [${VOCAB.action.join(', ')}]`;
+    if (!VOCAB.robot.includes(c.robot)) return `robot: "${c.robot}" is not in the fleet`;
+    if (c.action === 'move') {
+      const t = c.target;
+      if (!t || typeof t !== 'object') return 'target: required for move';
+      if (t.type === 'dock') { if (!VOCAB.dock.includes(t.id)) return `target.id: ${JSON.stringify(t.id)} is not a dock [A, B, C]`; }
+      else if (t.type === 'aisle') { if (!VOCAB.aisle.includes(t.id)) return `target.id: ${JSON.stringify(t.id)} is not an aisle [1, 2, 3, 4]`; }
+      else return `target.type: ${JSON.stringify(t.type)} is not one of [dock, aisle]`;
+    }
+    return null;
+  }
+  function grammar(text) {
+    const s = text.trim().toLowerCase().replace(/\s+/g, ' ');
+    const badRobot = id => `robot "${id}" is not in the fleet (R1 to R8)`;
+    let m = s.match(/^(?:send|move|drive|go) (r\d+) to (?:the )?(dock|aisle) ([a-z0-9]+)$/);
+    if (m) {
+      const robot = m[1].toUpperCase();
+      if (!VOCAB.robot.includes(robot)) return { error: badRobot(robot) };
+      if (m[2] === 'dock') {
+        const id = m[3].toUpperCase();
+        return VOCAB.dock.includes(id) ? { cmd: { action: 'move', robot, target: { type: 'dock', id } } } : { error: `dock "${id}" does not exist (A, B, C)` };
+      }
+      const n = Number(m[3]);
+      return VOCAB.aisle.includes(n) ? { cmd: { action: 'move', robot, target: { type: 'aisle', id: n } } } : { error: `aisle "${m[3]}" does not exist (1 to 4)` };
+    }
+    m = s.match(/^(stop|halt|resume|release) (r\d+)$/);
+    if (m) {
+      const robot = m[2].toUpperCase();
+      if (!VOCAB.robot.includes(robot)) return { error: badRobot(robot) };
+      return { cmd: { action: m[1] === 'stop' || m[1] === 'halt' ? 'stop' : 'resume', robot } };
+    }
+    return { error: 'no grammar rule matches. Try "send R2 to dock A", "stop R6" or "resume R6".' };
+  }
+  function plan(text) {
+    const steps = [], script = SCRIPTS[text.toLowerCase()];
+    if (script) {
+      for (let a = 0; a < script.length; a++) {
+        const e = validate(script[a]);
+        if (!e) { steps.push([`proposal ${a + 1}`, 'valid against schema', 'ok']); return { steps, cmd: script[a], prov: 'LLM' }; }
+        steps.push([`proposal ${a + 1}`, `rejected · ${e}`, 'bad']);
+        if (a === 0 && script.length > 1) steps.push(['re-prompt', 'exact error quoted back to the model (1 of 1)', '']);
+      }
+    } else {
+      steps.push(['model', 'not called for typed input in this demo', '']);
+    }
+    const g = grammar(text);
+    if (g.cmd) { steps.push(['grammar', 'parsed deterministically', 'ok']); return { steps, cmd: g.cmd, prov: 'GRAMMAR' }; }
+    steps.push(['grammar', g.error, 'bad']);
+    return { steps, error: g.error };
+  }
+  function execute(c, note) {
+    const r = robots.find(x => x.id === c.robot);
+    if (c.action === 'stop') {
+      if (!r.stopped) { r.stopped = true; freeze(r); }
+      updateStatus(); flash(`${r.id} stopped`);
+      return `${r.id} stopped. Tap it on the map or run "resume ${r.id}" to release it.`;
+    }
+    if (c.action === 'resume') {
+      r.stopped = false; updateStatus();
+      return fleetStop ? `${r.id} released, but the fleet E-stop is still engaged.` : `${r.id} released.`;
+    }
+    const dest = c.target.type === 'dock' ? { x: DOCKS[c.target.id], z: DOCK_Z } : { x: AISLE_X[c.target.id - 1], z: AISLE_MID };
+    const where = c.target.type === 'dock' ? `dock ${c.target.id}` : `aisle ${c.target.id}`;
+    if (Math.hypot(r.x - dest.x, r.z - dest.z) < 0.3) return `${r.id} is already at ${where}.`;
+    robots.forEach(o => {  // clear the destination for the commanded robot
+      if (o !== r && !o.cmd && !(fleetStop || o.stopped) && Math.hypot(o.x - dest.x, o.z - dest.z) < 1.3) {
+        const d = pickPatrol(o); o.dest = d; o.path = route(o, d.x, d.z); o.wait = 0;
+      }
+    });
+    r.path = route(r, dest.x, dest.z); r.dest = dest; r.cmd = c; r.hold = 0; r.wait = 0; r.where = where; r.noteEl = note;
+    activeBot = r;
+    flash(`${r.id} routing to ${where}`);
+    return fleetStop || r.stopped ? `${r.id} is stopped. It will head to ${where} after Resume.` : `${r.id} routing to ${where}. Route shown on the map.`;
+  }
+
+  const out = $('#out'), input = $('#cmd-input');
+  const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+  const esc = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const jsonHTML = o => esc(JSON.stringify(o, null, 2)).replace(/(&quot;[^&]*?&quot;)(\s*:)?|(-?\d+(?:\.\d+)?)|([{}\[\],])/g,
+    (m, str, colon, num, p) => str ? (colon ? `<span class="jk">${str}</span><span class="jp">${colon}</span>` : `<span class="js">${str}</span>`)
+      : num ? `<span class="jn">${num}</span>` : `<span class="jp">${p}</span>`);
+  let runId = 0;
+  function runCommand(raw) {
+    const text = raw.trim().replace(/\s+/g, ' ');
+    if (!text) { input.focus(); return; }
+    const id = ++runId, p = plan(text), delay = reduceMotion ? 120 : 360;
+    out.textContent = '';
+    const head = mk('div', 'out-head'), badge = mk('span', 'badge wait', '...'), state = mk('span', 'out-state', 'validating');
+    head.append(badge, mk('span', '', text), state);
+    const list = mk('ol', 'trace');
+    out.append(head, list);
+    p.steps.forEach((s, i) => setTimeout(() => {
+      if (id !== runId) return;
+      const li = mk('li'); li.append(mk('span', 'tk', s[0]), mk('span', 'tv ' + s[2], s[1])); list.append(li);
+    }, delay * (i + 1)));
+    setTimeout(() => {
+      if (id !== runId) return;
+      if (p.cmd) {
+        badge.className = 'badge ' + (p.prov === 'LLM' ? 'llm' : 'gram'); badge.textContent = p.prov; state.textContent = 'accepted';
+        const pre = mk('pre', 'json'); pre.innerHTML = jsonHTML(p.cmd);
+        const note = mk('p', 'out-note');
+        out.append(pre, note);
+        note.textContent = execute(p.cmd, note);
+      } else {
+        badge.className = 'badge rej'; badge.textContent = 'REJECTED'; state.textContent = 'not run';
+        out.append(mk('p', 'out-note', 'Nothing was sent to the fleet.'));
+      }
+    }, delay * (p.steps.length + 1));
+  }
+  $('#cmd-form').addEventListener('submit', e => { e.preventDefault(); input.blur(); runCommand(input.value); });
+  document.querySelectorAll('.preset').forEach(b => b.addEventListener('click', () => { input.value = b.dataset.cmd; runCommand(b.dataset.cmd); }));
+
+  $('#copy-email').addEventListener('click', async () => {
+    const btn = $('#copy-email');
+    try { await navigator.clipboard.writeText('ahmedsohaill2003@gmail.com'); btn.textContent = 'Copied'; }
+    catch (_) {
+      const range = document.createRange(); range.selectNodeContents($('#email'));
+      const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range); btn.textContent = 'Selected';
+    }
+    setTimeout(() => { btn.textContent = 'Copy'; }, 1600);
+  });
+
+  updateStatus();
+
+  /* ---------- 3D scene ---------- */
+  function goFallback() {
+    $('#stage').classList.add('is-fallback');
+    $('#fallback-msg').hidden = false;
+    hint.hidden = true;
+  }
+  function webglAvailable() {
+    try {
+      const c = document.createElement('canvas');
+      return !!(window.WebGLRenderingContext && (c.getContext('webgl2') || c.getContext('webgl') || c.getContext('experimental-webgl')));
+    } catch (e) { return false; }
+  }
+
+  function init3D() {
+    const T = window.THREE;
+    if (!T) throw new Error('three.js did not load');
+    if (!webglAvailable()) throw new Error('WebGL unavailable');
+    const stage = $('#stage'), canvas = $('#scene'), labels = $('#labels');
+    const renderer = new T.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: 'default' });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    const BG = 0x090D13;
+    renderer.setClearColor(BG, 1);
+    const scene = new T.Scene();
+    scene.fog = new T.Fog(BG, 20, 46);
+    const camera = new T.PerspectiveCamera(38, 1, 0.5, 140);
+    const ACCENT = new T.Color(0x38BDF8), RED = new T.Color(0xEF4444), TRAIL = new T.Color(0x38BDF8).multiplyScalar(0.5);
+
+    scene.add(new T.HemisphereLight(0xC4D6EA, 0x0B1017, 0.95));
+    const sun = new T.DirectionalLight(0xFFFFFF, 0.75); sun.position.set(-5, 12, 7); scene.add(sun);
+
+    // Floor, work area, grid
+    const floor = new T.Mesh(new T.PlaneGeometry(90, 90), new T.MeshBasicMaterial({ color: 0x0A0F15 }));
+    floor.rotation.x = -Math.PI / 2; scene.add(floor);
+    const pad = new T.Mesh(new T.PlaneGeometry(15.4, 12.8), new T.MeshBasicMaterial({ color: 0x0D141D }));
+    pad.rotation.x = -Math.PI / 2; pad.position.set(0, 0.002, -0.3); scene.add(pad);
+    const grid = new T.GridHelper(60, 60, 0x1E2A38, 0x151E29); grid.position.y = 0.004; scene.add(grid);
+
+    // Racks
+    const rackGeo = new T.BoxGeometry(RACK_W, RACK_H, RACK_Z1 - RACK_Z0);
+    const rackMat = new T.MeshStandardMaterial({ color: 0x131B26, roughness: 0.85, metalness: 0.1 });
+    const rackEdges = new T.EdgesGeometry(rackGeo), edgeMat = new T.LineBasicMaterial({ color: 0x2F3E51 });
+    RACK_X.forEach(x => {
+      const m = new T.Mesh(rackGeo, rackMat); m.position.set(x, RACK_H / 2, (RACK_Z0 + RACK_Z1) / 2); scene.add(m);
+      const e = new T.LineSegments(rackEdges, edgeMat); e.position.copy(m.position); scene.add(e);
+    });
+
+    // Docks
+    const DW = 2.1, DD = 1.4;
+    const dockLine = new T.LineBasicMaterial({ color: 0x38BDF8, transparent: true, opacity: 0.55 });
+    const dockFill = new T.MeshBasicMaterial({ color: 0x38BDF8, transparent: true, opacity: 0.06, depthWrite: false });
+    Object.values(DOCKS).forEach(x => {
+      const pts = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([a, b]) => new T.Vector3(x + a * DW / 2, 0.012, DOCK_Z + b * DD / 2));
+      scene.add(new T.LineLoop(new T.BufferGeometry().setFromPoints(pts), dockLine));
+      const f = new T.Mesh(new T.PlaneGeometry(DW, DD), dockFill); f.rotation.x = -Math.PI / 2; f.position.set(x, 0.008, DOCK_Z); scene.add(f);
+    });
+    const wall = new T.Mesh(new T.BoxGeometry(15.4, 0.06, 0.06), new T.MeshBasicMaterial({ color: 0x2A3747 }));
+    wall.position.set(0, 0.03, DOCK_Z + DD / 2 + 0.45); scene.add(wall);
+
+    // Robots: rounded box body, glowing top light, light pool on the floor
+    const BW = 0.9, BD = 1.12, BH = 0.38, BEV = 0.08, LIFT = 0.05;
+    const s = new T.Shape(), w = BW - 2 * BEV, d = BD - 2 * BEV, rr = 0.1, x0 = -w / 2, y0 = -d / 2;
+    s.moveTo(x0 + rr, y0); s.lineTo(x0 + w - rr, y0); s.quadraticCurveTo(x0 + w, y0, x0 + w, y0 + rr);
+    s.lineTo(x0 + w, y0 + d - rr); s.quadraticCurveTo(x0 + w, y0 + d, x0 + w - rr, y0 + d);
+    s.lineTo(x0 + rr, y0 + d); s.quadraticCurveTo(x0, y0 + d, x0, y0 + d - rr);
+    s.lineTo(x0, y0 + rr); s.quadraticCurveTo(x0, y0, x0 + rr, y0);
+    const bodyGeo = new T.ExtrudeGeometry(s, { depth: BH - 2 * BEV, bevelEnabled: true, bevelThickness: BEV, bevelSize: BEV, bevelSegments: 3, curveSegments: 4 });
+    bodyGeo.rotateX(-Math.PI / 2); bodyGeo.center();
+    const bodyMat = new T.MeshStandardMaterial({ color: 0x2E3B4C, roughness: 0.45, metalness: 0.3 });
+    const capGeo = new T.CylinderGeometry(0.14, 0.16, 0.07, 20);
+    const noseGeo = new T.BoxGeometry(0.5, 0.05, 0.02), noseMat = new T.MeshBasicMaterial({ color: 0xA9B8C9 });
+    const radial = (g, inner) => {  // white centre fading to black: a soft glow under additive blending
+      const n = g.attributes.position.count, c = new Float32Array(n * 3);
+      for (let i = 0; i < inner; i++) c[i * 3] = c[i * 3 + 1] = c[i * 3 + 2] = 1;
+      g.setAttribute('color', new T.BufferAttribute(c, 3)); g.rotateX(-Math.PI / 2); return g;
+    };
+    const glowGeo = radial(new T.RingGeometry(0.15, 0.52, 28, 1), 29);
+    const poolGeo = radial(new T.CircleGeometry(1.15, 32), 1);
+    const additive = o => new T.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: o, blending: T.AdditiveBlending, depthWrite: false, fog: false });
+
+    const TRAIL_MAX = 44, TRAIL_T = 2.6;
+    const trailMat = new T.MeshBasicMaterial({ vertexColors: true, transparent: true, blending: T.AdditiveBlending, depthWrite: false, side: T.DoubleSide, fog: false });
+    function makeTrail() {
+      const pos = new Float32Array(TRAIL_MAX * 6), col = new Float32Array(TRAIL_MAX * 6), idx = [];
+      for (let i = 0; i < TRAIL_MAX - 1; i++) { const a = 2 * i; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+      const geo = new T.BufferGeometry();
+      geo.setAttribute('position', new T.BufferAttribute(pos, 3).setUsage(T.DynamicDrawUsage));
+      geo.setAttribute('color', new T.BufferAttribute(col, 3).setUsage(T.DynamicDrawUsage));
+      geo.setIndex(idx); geo.setDrawRange(0, 0);
+      const mesh = new T.Mesh(geo, trailMat); mesh.frustumCulled = false; scene.add(mesh);
+      return { pts: [], pos, col, geo };
+    }
+
+    robots.forEach(r => {
+      const g = new T.Group();
+      const body = new T.Mesh(bodyGeo, bodyMat); body.position.y = LIFT + BH / 2; g.add(body);
+      const nose = new T.Mesh(noseGeo, noseMat); nose.position.set(0, LIFT + BH * 0.55, BD / 2 + 0.006); g.add(nose);
+      r.capMat = new T.MeshBasicMaterial({ color: ACCENT.clone() });
+      const cap = new T.Mesh(capGeo, r.capMat); cap.position.y = LIFT + BH + 0.035; g.add(cap);
+      r.glowMat = additive(0.7); r.glowMat.color.copy(ACCENT);
+      const glow = new T.Mesh(glowGeo, r.glowMat); glow.position.y = LIFT + BH + 0.012; g.add(glow);
+      r.poolMat = additive(0.34); r.poolMat.color.copy(ACCENT);
+      const pool = new T.Mesh(poolGeo, r.poolMat); pool.position.y = 0.014; g.add(pool);
+      scene.add(g);
+      r.g = g; r.trail = makeTrail(); r.state = '';
+      r.lab = document.createElement('span'); r.lab.className = 'lbl'; r.lab.textContent = r.id; labels.appendChild(r.lab);
+    });
+
+    const zones = [];
+    Object.entries(DOCKS).forEach(([k, x]) => zones.push({ text: 'DOCK ' + k, x, z: DOCK_Z - 0.98 }));
+    AISLE_X.forEach((x, i) => zones.push({ text: 'AISLE ' + (i + 1), x, z: RACK_Z1 + 0.38 }));
+    zones.forEach(z => { z.el = document.createElement('span'); z.el.className = 'lbl zone'; z.el.textContent = z.text; labels.appendChild(z.el); });
+
+    // Commanded route (dashed) and destination ring; buffers preallocated
+    const RMAX = 8, rPos = new Float32Array(RMAX * 3), rDist = new Float32Array(RMAX), rGeo = new T.BufferGeometry();
+    rGeo.setAttribute('position', new T.BufferAttribute(rPos, 3).setUsage(T.DynamicDrawUsage));
+    rGeo.setAttribute('lineDistance', new T.BufferAttribute(rDist, 1).setUsage(T.DynamicDrawUsage));
+    const routeLine = new T.Line(rGeo, new T.LineDashedMaterial({ color: 0x38BDF8, dashSize: 0.3, gapSize: 0.2, transparent: true, opacity: 0.9, fog: false }));
+    routeLine.frustumCulled = false; routeLine.visible = false; scene.add(routeLine);
+    const ringMat = new T.MeshBasicMaterial({ color: 0x38BDF8, transparent: true, opacity: 0.9, depthWrite: false, fog: false, side: T.DoubleSide });
+    const ring = new T.Mesh(new T.RingGeometry(0.66, 0.78, 40).rotateX(-Math.PI / 2), ringMat); ring.visible = false; scene.add(ring);
+    function setRoute(r) {
+      let n = 0, dsum = 0, px = r.rx, pz = r.rz;
+      const push = (x, z) => { if (n >= RMAX) return; if (n) dsum += Math.hypot(x - px, z - pz); rPos[n * 3] = x; rPos[n * 3 + 1] = 0.035; rPos[n * 3 + 2] = z; rDist[n] = dsum; px = x; pz = z; n++; };
+      push(r.rx, r.rz); r.path.forEach(p => push(p.x, p.z));
+      rGeo.attributes.position.needsUpdate = true; rGeo.attributes.lineDistance.needsUpdate = true; rGeo.setDrawRange(0, n);
+    }
+
+    function updateTrail(r, now) {
+      const tr = r.trail, pts = tr.pts, head = pts[0];
+      if (!head || Math.hypot(r.rx - head.x, r.rz - head.z) > 0.14) { pts.unshift({ x: r.rx, z: r.rz, t: now }); if (pts.length > TRAIL_MAX - 1) pts.length = TRAIL_MAX - 1; }
+      while (pts.length && now - pts[pts.length - 1].t > TRAIL_T) pts.pop();
+      const P = [{ x: r.rx, z: r.rz, t: now }].concat(pts), n = P.length;
+      if (n < 3) { tr.geo.setDrawRange(0, 0); return; }
+      let nx = 0, nz = 0;
+      for (let i = 0; i < n; i++) {
+        const a = P[Math.max(i - 1, 0)], b = P[Math.min(i + 1, n - 1)], dx = a.x - b.x, dz = a.z - b.z, L = Math.hypot(dx, dz);
+        if (L > 1e-4) { nx = -dz / L; nz = dx / L; }
+        let f = 1 - (now - P[i].t) / TRAIL_T; f = f > 0 ? f * f : 0;
+        const hw = 0.11 * (1 - i / (n - 1)) + 0.015, o = i * 6, p = P[i];
+        tr.pos[o] = p.x + nx * hw; tr.pos[o + 1] = 0.02; tr.pos[o + 2] = p.z + nz * hw;
+        tr.pos[o + 3] = p.x - nx * hw; tr.pos[o + 4] = 0.02; tr.pos[o + 5] = p.z - nz * hw;
+        tr.col[o] = tr.col[o + 3] = TRAIL.r * f; tr.col[o + 1] = tr.col[o + 4] = TRAIL.g * f; tr.col[o + 2] = tr.col[o + 5] = TRAIL.b * f;
+      }
+      tr.geo.attributes.position.needsUpdate = true; tr.geo.attributes.color.needsUpdate = true;
+      tr.geo.setDrawRange(0, (n - 1) * 6);
+    }
+
+    // Camera orbit (horizontal drag only; the canvas has touch-action: pan-y)
+    let yaw = 0.3, yawVel = 0, dist = 18;
+    const elev = 0.93, look = new T.Vector3(0, 0, -0.35), size = { w: 1, h: 1 };
+    function placeCamera() {
+      const c = Math.cos(elev) * dist;
+      camera.position.set(look.x + Math.sin(yaw) * c, Math.sin(elev) * dist, look.z + Math.cos(yaw) * c);
+      camera.lookAt(look);
+    }
+    function resize() {
+      const w = stage.clientWidth, h = stage.clientHeight; if (!w || !h) return;
+      renderer.setSize(w, h, false); camera.aspect = w / h;
+      const tv = Math.tan(T.MathUtils.degToRad(camera.fov / 2)), th = tv * camera.aspect;
+      dist = Math.max(6.9 / th, 6.9 / tv);
+      camera.updateProjectionMatrix();
+      scene.fog.near = dist + 2; scene.fog.far = dist + 30;
+      size.w = w; size.h = h;
+    }
+    const v3 = new T.Vector3();
+    function toScreen(x, y, z) { v3.set(x, y, z).project(camera); return v3.z < 1 ? [(v3.x * 0.5 + 0.5) * size.w, (-v3.y * 0.5 + 0.5) * size.h] : null; }
+    function placeLabel(el, x, y, z, ay) {
+      const p = toScreen(x, y, z);
+      if (!p) { el.style.visibility = 'hidden'; return; }
+      el.style.visibility = '';
+      el.style.transform = `translate3d(${p[0].toFixed(1)}px,${p[1].toFixed(1)}px,0) translate(-50%,${ay})`;
+    }
+
+    let drag = null;
+    canvas.addEventListener('pointerdown', e => { drag = { id: e.pointerId, x0: e.clientX, y0: e.clientY, x: e.clientX, t: performance.now(), moved: false }; yawVel = 0; });
+    canvas.addEventListener('pointermove', e => {
+      if (!drag || e.pointerId !== drag.id) return;
+      const dx = e.clientX - drag.x; drag.x = e.clientX;
+      const ox = Math.abs(e.clientX - drag.x0), oy = Math.abs(e.clientY - drag.y0);
+      if (!drag.moved && ox > 6 && ox > oy) { drag.moved = true; try { canvas.setPointerCapture(e.pointerId); } catch (_) {} }
+      if (drag.moved) { yaw -= dx * 0.0085; yawVel = reduceMotion ? 0 : -dx * 0.0085; }
+    });
+    canvas.addEventListener('pointerup', e => {
+      if (drag && !drag.moved && performance.now() - drag.t < 500 && Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) < 10) {
+        const rect = canvas.getBoundingClientRect(), px = e.clientX - rect.left, py = e.clientY - rect.top;
+        let best = null, bd = 40;
+        for (const r of robots) { const p = toScreen(r.rx, 0.3, r.rz); if (!p) continue; const dd = Math.hypot(p[0] - px, p[1] - py); if (dd < bd) { bd = dd; best = r; } }
+        if (best) toggleRobot(best);
+      }
+      drag = null;
+    });
+    canvas.addEventListener('pointercancel', () => { drag = null; });
+
+    let raf = 0, running = false, last = 0, acc = 0, onScreen = true;
+    function frame(now) {
+      raf = requestAnimationFrame(frame);
+      const dt = Math.min(0.25, Math.max(0, (now - last) / 1000)); last = now;
+      acc += dt;
+      let n = 0; while (acc >= SIM_DT && n < 4) { simStep(); acc -= SIM_DT; n++; }
+      if (acc >= SIM_DT) acc = 0;
+      alpha = acc / SIM_DT;
+      if (!drag && yawVel) { yaw += yawVel; yawVel *= 0.9; if (Math.abs(yawVel) < 1e-4) yawVel = 0; }
+      placeCamera();
+      const t = now / 1000;
+      for (const r of robots) {
+        r.rx = r.px + (r.x - r.px) * alpha; r.rz = r.pz + (r.z - r.pz) * alpha; r.rh = lerpAngle(r.ph, r.h, alpha);
+        r.g.position.set(r.rx, 0, r.rz); r.g.rotation.y = r.rh;
+        const stopped = fleetStop || r.stopped, st = stopped ? 's' : r.cmd ? 'c' : 'n';
+        if (st !== r.state) {
+          const col = stopped ? RED : ACCENT;
+          r.capMat.color.copy(col); r.glowMat.color.copy(col); r.poolMat.color.copy(col);
+          r.lab.className = 'lbl' + (stopped ? ' is-stopped' : r.cmd ? ' is-cmd' : '');
+          r.state = st;
+        }
+        r.glowMat.opacity = reduceMotion ? 0.75 : st === 'c' ? 0.6 + 0.4 * Math.sin(t * 7) : st === 's' ? 0.75 + 0.2 * Math.sin(t * 3) : 0.7;
+        updateTrail(r, t);
+        placeLabel(r.lab, r.rx, 1.0, r.rz, '-100%');
+        const sp = toScreen(r.rx, 0.3, r.rz);
+        r.sx = sp ? sp[0] : -1e4; r.sy = sp ? sp[1] : -1e4;
+      }
+      const a = activeBot;
+      if (a && a.cmd && a.path.length) {
+        setRoute(a); routeLine.visible = true;
+        ring.visible = true; ring.position.set(a.dest.x, 0.02, a.dest.z);
+        const k = reduceMotion ? 1 : 1 + 0.08 * Math.sin(t * 5); ring.scale.set(k, 1, k);
+      } else { routeLine.visible = false; ring.visible = false; }
+      zones.forEach(z => {  // floor labels dim while a robot passes over them
+        placeLabel(z.el, z.x, 0, z.z, '-50%');
+        const p = toScreen(z.x, 0, z.z);
+        let near = false;
+        if (p) for (const r of robots) { if (Math.abs(r.sx - p[0]) < 44 && Math.abs(r.sy - p[1]) < 28) { near = true; break; } }
+        z.el.style.opacity = near ? '0.15' : '';
+      });
+      renderer.render(scene, camera);
+    }
+    function start() { if (running || document.hidden || !onScreen) return; running = true; last = performance.now(); raf = requestAnimationFrame(frame); }
+    function stop() { running = false; cancelAnimationFrame(raf); }
+
+    document.addEventListener('visibilitychange', () => { if (document.hidden) stop(); else start(); });
+    if ('IntersectionObserver' in window) new IntersectionObserver(es => { onScreen = es[0].isIntersecting; if (onScreen) start(); else stop(); }).observe(stage);
+    canvas.addEventListener('webglcontextlost', e => { e.preventDefault(); stop(); goFallback(); });
+    if ('ResizeObserver' in window) new ResizeObserver(resize).observe(stage); else window.addEventListener('resize', resize);
+    resize(); placeCamera(); start();
+  }
+
+  try { init3D(); } catch (err) { goFallback(); }
+})();
+</script>
+</body>
+</html>
